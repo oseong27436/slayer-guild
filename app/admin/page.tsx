@@ -80,7 +80,7 @@ export default function AdminPage() {
     <div className="min-h-screen bg-slate-900 text-slate-100 p-6">
       <div className="max-w-xl mx-auto">
         <h1 className="text-2xl font-bold mb-1">⚔️ 길드 마스터 툴</h1>
-        <p className="text-slate-400 text-sm mb-6">용협 스크린샷 → Claude OCR → 노션 자동 기록</p>
+        <div className="mb-6" />
 
         {/* 날짜 */}
         <div className="mb-4">
