@@ -276,6 +276,15 @@ export default function Home() {
               )}
 
               <p className="text-center text-slate-400 text-xs mt-4">1분마다 자동 갱신</p>
+
+              <div className="text-center mt-3">
+                <a
+                  href="/admin"
+                  className="text-xs text-slate-500 hover:text-slate-400 transition"
+                >
+                  ⚙️ 관리자
+                </a>
+              </div>
             </>
           )}
         </div>
