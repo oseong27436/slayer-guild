@@ -86,7 +86,7 @@ export default function Home() {
     }).catch(() => setLoading(false))
   }, [])
 
-  // 닉네임 → 증감 맵 (같은 주 내 전날 대비만 표시)
+  // 닉네임 → 증감 맵 (오늘 기록이 있을 때만, 같은 주 내 전날 대비)
   const getMonWeek = (dateStr: string) => {
     const d = new Date(dateStr)
     const day = d.getDay()
@@ -95,13 +95,15 @@ export default function Home() {
     return mon.toISOString().slice(0, 10)
   }
 
+  const today = new Date().toLocaleDateString('sv-SE')  // YYYY-MM-DD (로컬 날짜)
+
   const diffMap: Record<string, number | null> = {}
   history.forEach(entry => {
     const valid = entry.weeks.filter((w): w is { date: string; score: number } => w.score !== null)
     if (valid.length >= 2) {
       const last = valid[valid.length - 1]
       const prev = valid[valid.length - 2]
-      if (getMonWeek(last.date) === getMonWeek(prev.date)) {
+      if (last.date === today && getMonWeek(last.date) === getMonWeek(prev.date)) {
         diffMap[entry.닉네임] = last.score - prev.score
       } else {
         diffMap[entry.닉네임] = null
