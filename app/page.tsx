@@ -283,14 +283,18 @@ export default function Home() {
       if (guild === '별') weeklyMap[w.date].별 += w.score!
     })
   })
-  const chartData = Object.entries(weeklyMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .filter(([date]) => new Date(date).getDay() === 0) // 일요일만
-    .map(([date, scores]) => ({
-      date: date.slice(5), // MM-DD
-      루나: scores.루나,
-      별: scores.별,
-    }))
+  // 최근 7주 일요일 고정
+  const last7Sundays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date()
+    const day = d.getDay()
+    d.setDate(d.getDate() - (day === 0 ? 0 : day) - (6 - i) * 7)
+    return d.toISOString().slice(0, 10)
+  })
+  const chartData = last7Sundays.map(date => ({
+    date: date.slice(5),
+    루나: weeklyMap[date]?.루나 ?? 0,
+    별: weeklyMap[date]?.별 ?? 0,
+  }))
 
   return (
     <div className="bg-slate-100 min-h-screen">
