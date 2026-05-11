@@ -357,7 +357,7 @@ export default function Home() {
                     )}
                     <span className="flex-1 text-sm font-medium text-slate-800 min-w-0 truncate text-center">
                       {m.역할 === '길드마스터' && <span className="mr-1">👑</span>}
-                      {m.역할 === '부길드마스터' && <span className="mr-1" style={{filter:'grayscale(1) brightness(0.4)'}}>👑</span>}
+                      {m.역할 === '부길드마스터' && <span className="mr-1" style={{filter:'grayscale(1) brightness(0.75)'}}>👑</span>}
                       {m.닉네임}
                     </span>
                     <div className="w-10 flex justify-center shrink-0">
