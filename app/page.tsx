@@ -366,8 +366,8 @@ export default function Home() {
                       <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={v => Number(v).toLocaleString()} width={72} />
                       <Tooltip formatter={(v) => typeof v === 'number' ? v.toLocaleString() : String(v)} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }} />
                       <Legend wrapperStyle={{ fontSize: 12 }} />
-                      <Line type="monotone" dataKey="루나" stroke="#9333ea" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="별" stroke="#eab308" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      <Line type="linear" dataKey="루나" stroke="#9333ea" strokeWidth={2} dot={{ r: 3, fill: '#9333ea' }} activeDot={{ r: 5 }} />
+                      <Line type="linear" dataKey="별" stroke="#eab308" strokeWidth={2} dot={{ r: 3, fill: '#eab308' }} activeDot={{ r: 5 }} />
                     </LineChart>
                   </ResponsiveContainer>
                   {chartData.length > 1 && (() => {
@@ -385,7 +385,7 @@ export default function Home() {
                             <div className={`text-xs font-medium mb-1 ${g.color}`}>{g.label}</div>
                             <div className="text-lg font-bold text-slate-800">{g.total.toLocaleString()}</div>
                             <div className={`text-xs mt-0.5 ${g.diff >= 0 ? 'text-rose-500' : 'text-blue-400'}`}>
-                              {g.diff >= 0 ? '+' : ''}{g.diff.toLocaleString()}
+                              전주대비 {g.diff >= 0 ? '+' : ''}{g.diff.toLocaleString()}
                             </div>
                           </div>
                         ))}
