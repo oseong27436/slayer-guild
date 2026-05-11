@@ -285,6 +285,7 @@ export default function Home() {
   })
   const chartData = Object.entries(weeklyMap)
     .sort(([a], [b]) => a.localeCompare(b))
+    .filter(([date]) => new Date(date).getDay() === 0) // 일요일만
     .map(([date, scores]) => ({
       date: date.slice(5), // MM-DD
       루나: scores.루나,
