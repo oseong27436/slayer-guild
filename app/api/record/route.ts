@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server'
 
 const TOKEN = process.env.NOTION_TOKEN
-const HISTORY_DB = process.env.NOTION_HISTORY_DB_ID
 const MEMBERS_DB = process.env.NOTION_MEMBERS_DB_ID
+const SUPABASE_URL = process.env.SUPABASE_URL!
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY!
+const TG_TOKEN = '8091687172:AAGbQjeCzAxzBNg-2azPlUOmedgJydyMt5M'
+const TG_CHAT = '8613313428'
+
+async function tgSend(text: string) {
+  await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: TG_CHAT, text }),
+  }).catch(() => {})
+}
 
 interface RecordItem {
   nickname: string
@@ -20,26 +31,36 @@ async function notionApi(method: string, url: string, body?: object) {
     body: body ? JSON.stringify(body) : undefined,
     cache: 'no-store',
   })
-  return res.json()
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.message || `Notion ${res.status}`)
+  return json
+}
+
+async function supabaseUpsert(records: RecordItem[], date: string) {
+  const rows = records.map(({ nickname, score }) => ({
+    member_name: nickname,
+    recorded_date: date,
+    score,
+  }))
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/slayer_history`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify(rows),
+  })
+  if (!res.ok) throw new Error(`Supabase ${res.status}`)
 }
 
 export async function POST(req: Request) {
   try {
     const { records, date } = (await req.json()) as { records: RecordItem[]; date: string }
 
-    // 히스토리 DB에 기록
-    await Promise.all(
-      records.map(({ nickname, score }) =>
-        notionApi('POST', 'https://api.notion.com/v1/pages', {
-          parent: { database_id: HISTORY_DB },
-          properties: {
-            닉네임: { title: [{ text: { content: nickname } }] },
-            날짜: { date: { start: date } },
-            점수: { number: score },
-          },
-        })
-      )
-    )
+    // Supabase 히스토리 upsert
+    await supabaseUpsert(records, date)
 
     // 멤버 DB 용협 필드 업데이트
     const membersRes = await notionApi(
@@ -65,6 +86,12 @@ export async function POST(req: Request) {
           })
         })
     )
+
+    const lines = records
+      .sort((a, b) => b.score - a.score)
+      .map(({ nickname, score }) => `  ${nickname}: ${score.toLocaleString()}`)
+      .join('\n')
+    await tgSend(`📊 용협 점수 저장 (${date})\n\n${lines}\n\n총 ${records.length}명`)
 
     return NextResponse.json({ ok: true, count: records.length })
   } catch (err) {
