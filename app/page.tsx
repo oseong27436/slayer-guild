@@ -362,7 +362,7 @@ export default function Home() {
                   <ResponsiveContainer width="100%" height={280}>
                     <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                      <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={v => (v / 1000000).toFixed(1) + 'M'} width={36} />
+                      <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={v => Number(v).toLocaleString()} width={72} />
                       <Tooltip formatter={(v) => typeof v === 'number' ? v.toLocaleString() : String(v)} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }} />
                       <Legend wrapperStyle={{ fontSize: 12 }} />
                       <Line type="monotone" dataKey="루나" stroke="#9333ea" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
@@ -382,7 +382,7 @@ export default function Home() {
                         ].map(g => (
                           <div key={g.label} className="bg-slate-50 rounded-xl p-3 text-center">
                             <div className={`text-xs font-medium mb-1 ${g.color}`}>{g.label}</div>
-                            <div className="text-lg font-bold text-slate-800">{(g.total / 1000000).toFixed(2)}M</div>
+                            <div className="text-lg font-bold text-slate-800">{g.total.toLocaleString()}</div>
                             <div className={`text-xs mt-0.5 ${g.diff >= 0 ? 'text-rose-500' : 'text-blue-400'}`}>
                               {g.diff >= 0 ? '+' : ''}{g.diff.toLocaleString()}
                             </div>
