@@ -9,40 +9,31 @@ export interface Member {
   용협: string
 }
 
-const NOTION_TOKEN = process.env.NOTION_TOKEN
-const MEMBERS_DB_ID = process.env.NOTION_MEMBERS_DB_ID
+const SUPABASE_URL = process.env.SUPABASE_URL!
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY!
 
 export async function GET() {
-  const res = await fetch(`https://api.notion.com/v1/databases/${MEMBERS_DB_ID}/query`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${NOTION_TOKEN}`,
-      'Notion-Version': '2022-06-28',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      sorts: [{ property: '번호', direction: 'ascending' }],
-      page_size: 100,
-    }),
-    cache: 'no-store',
-  })
-
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/slayer_members?select=번호,길드,닉네임,승급,역할,용협&order=번호.asc`,
+    {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      cache: 'no-store',
+    }
+  )
   if (!res.ok) return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
 
-  const data = await res.json()
-  const results = data.results || []
+  const rows: { 번호: number; 길드: string; 닉네임: string; 승급: string; 역할: string | null; 용협: number | null }[] = await res.json()
 
-  const members: Member[] = results.map((page: any) => {
-    const props = page.properties
-    return {
-      번호: props['번호']?.number?.toString() || '',
-      길드: props['길드']?.select?.name || '',
-      닉네임: props['닉네임']?.title?.[0]?.plain_text || '',
-      승급: props['승급']?.select?.name || '',
-      역할: props['역할']?.select?.name || '',
-      용협: props['용협']?.number != null ? props['용협'].number.toString() : '-',
-    }
-  }).filter((m: Member) => m.닉네임)
+  const members: Member[] = rows
+    .filter(r => r.닉네임)
+    .map(r => ({
+      번호: r.번호?.toString() ?? '',
+      길드: r.길드 ?? '',
+      닉네임: r.닉네임,
+      승급: r.승급 ?? '',
+      역할: r.역할 ?? '',
+      용협: r.용협 != null ? r.용협.toString() : '-',
+    }))
 
   return NextResponse.json(members)
 }
