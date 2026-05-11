@@ -67,6 +67,115 @@ function DistributionChart({ members }: { members: Member[] }) {
   )
 }
 
+const PROMOTION_LIST = [
+  '스톤', '브론즈', '아이언', '실버', '골드',
+  '미스릴', '오리하르콘', '아케이나이트', '아다만타이트',
+  '에테르', '블랙미스릴', '데몬메탈', '드라고노스',
+  '라그나블러드', '워프로스트', '다크녹스', '블루어비스',
+  '인피넌트', '사이클로스', '에이션트케나인', '기가로크',
+  '아이젠하르트', '다이아더스트', '엘든우드', '블리츠골드',
+]
+
+function PromotionRequestModal({ members, onClose }: { members: Member[], onClose: () => void }) {
+  const [닉네임, set닉네임] = useState('')
+  const [idx, setIdx] = useState(0)
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+
+  const current = members.find(m => m.닉네임 === 닉네임)?.승급 || ''
+  const 요청승급 = PROMOTION_LIST[idx]
+
+  const prev = () => setIdx(i => (i - 1 + PROMOTION_LIST.length) % PROMOTION_LIST.length)
+  const next = () => setIdx(i => (i + 1) % PROMOTION_LIST.length)
+
+  const handleNickname = (name: string) => {
+    set닉네임(name)
+    const cur = members.find(m => m.닉네임 === name)?.승급 || ''
+    const curIdx = PROMOTION_LIST.indexOf(cur)
+    setIdx(curIdx >= 0 ? curIdx : 0)
+  }
+
+  const submit = async () => {
+    if (!닉네임 || 요청승급 === current) return
+    setStatus('loading')
+    const res = await fetch('/api/promotion-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 닉네임, 현재승급: current, 요청승급 }),
+    })
+    setStatus(res.ok ? 'done' : 'error')
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="px-6 pt-6 pb-4">
+          <h2 className="text-lg font-bold text-slate-800 mb-4 text-center">⬆️ 승급 변경 요청</h2>
+
+          {status === 'done' ? (
+            <div className="text-center py-6">
+              <p className="text-2xl mb-2">🎉</p>
+              <p className="text-green-600 font-medium">요청이 접수됐어요!</p>
+              <p className="text-slate-400 text-sm mt-1">길드마스터 승인 후 반영됩니다</p>
+              <button onClick={onClose} className="mt-5 bg-slate-100 rounded-xl px-8 py-2.5 text-sm font-medium">닫기</button>
+            </div>
+          ) : (
+            <>
+              {/* 닉네임 선택 */}
+              <select
+                value={닉네임}
+                onChange={e => handleNickname(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-5"
+              >
+                <option value="">닉네임을 선택하세요</option>
+                {members.map(m => <option key={m.닉네임} value={m.닉네임}>{m.닉네임}</option>)}
+              </select>
+
+              {/* 승급 캐러셀 */}
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <button onClick={prev} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-lg transition shrink-0">‹</button>
+                <div className="flex-1 flex flex-col items-center py-4">
+                  {HAS_IMAGE.has(요청승급) ? (
+                    <Image src={`/promotion/${요청승급}.webp`} alt={요청승급} width={80} height={80} />
+                  ) : (
+                    <div className="w-20 h-20 flex items-center justify-center bg-slate-100 rounded-full text-slate-400 text-sm">{요청승급}</div>
+                  )}
+                  <p className="mt-3 font-bold text-slate-800 text-base">{요청승급}</p>
+                  {current && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {요청승급 === current ? '현재 승급' : `현재: ${current}`}
+                    </p>
+                  )}
+                </div>
+                <button onClick={next} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-lg transition shrink-0">›</button>
+              </div>
+
+              {/* 인디케이터 */}
+              <div className="flex justify-center gap-1 mb-5">
+                {PROMOTION_LIST.map((_, i) => (
+                  <div key={i} onClick={() => setIdx(i)}
+                    className={`h-1 rounded-full cursor-pointer transition-all ${i === idx ? 'w-4 bg-purple-500' : 'w-1 bg-slate-200'}`} />
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={onClose} className="flex-1 border border-slate-200 rounded-xl py-2.5 text-sm text-slate-500">취소</button>
+                <button
+                  onClick={submit}
+                  disabled={!닉네임 || 요청승급 === current || status === 'loading'}
+                  className="flex-1 bg-purple-600 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-40"
+                >
+                  {status === 'loading' ? '전송 중...' : '요청하기'}
+                </button>
+              </div>
+              {status === 'error' && <p className="text-red-400 text-xs text-center mt-2">오류가 발생했어요</p>}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Home() {
   const [members, setMembers] = useState<Member[]>([])
   const [history, setHistory] = useState<HistoryEntry[]>([])
@@ -74,6 +183,7 @@ export default function Home() {
   const [sort, setSort] = useState<'기본' | '용협↓' | '승급↓' | '증감↓'>('기본')
   const [loading, setLoading] = useState(true)
   const [showStats, setShowStats] = useState(false)
+  const [showRequestModal, setShowRequestModal] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -86,6 +196,23 @@ export default function Home() {
     }).catch(() => setLoading(false))
   }, [])
 
+  // 방문 추적
+  useEffect(() => {
+    let sessionId = localStorage.getItem('slayer_session')
+    if (!sessionId) {
+      sessionId = crypto.randomUUID()
+      localStorage.setItem('slayer_session', sessionId)
+    }
+    const track = () => fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId }),
+    }).catch(() => {})
+    track()
+    const interval = setInterval(track, 60_000)
+    return () => clearInterval(interval)
+  }, [])
+
   // 닉네임 → 증감 맵 (오늘 기록이 있을 때만, 같은 주 내 전날 대비)
   const getMonWeek = (dateStr: string) => {
     const d = new Date(dateStr)
@@ -96,6 +223,8 @@ export default function Home() {
   }
 
   const today = new Date().toLocaleDateString('sv-SE')  // YYYY-MM-DD (로컬 날짜)
+  const isFriday = new Date().getDay() === 5
+  const FRIDAY_THRESHOLD = 21000
 
   const diffMap: Record<string, number | null> = {}
   history.forEach(entry => {
@@ -123,7 +252,8 @@ export default function Home() {
     if (sort === '용협↓') return (Number(b.용협) || 0) - (Number(a.용협) || 0)
     if (sort === '승급↓') return PROMOTION_ORDER.indexOf(b.승급) - PROMOTION_ORDER.indexOf(a.승급)
     if (sort === '증감↓') return (diffMap[b.닉네임] ?? 0) - (diffMap[a.닉네임] ?? 0)
-    return 0
+    // 기본: 번호 오름차순 (길마는 번호로 이미 각 길드 최상단)
+    return Number(a.번호) - Number(b.번호)
   })
 
   const guildCount: Record<string, number> = {}
@@ -161,6 +291,14 @@ export default function Home() {
             <div className="text-center text-slate-400 py-16 text-sm">불러오는 중...</div>
           ) : (
             <>
+              {/* 승급 변경 요청 버튼 */}
+              <button
+                onClick={() => setShowRequestModal(true)}
+                className="w-full mb-3 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-violet-500 text-white text-sm font-medium shadow-sm flex items-center justify-center gap-2"
+              >
+                ⬆️ 승급 변경 요청하기
+              </button>
+
               {/* 탭 + 정렬 */}
               <div className="flex gap-2 mb-3">
                 {tabs.map(t => (
@@ -192,6 +330,8 @@ export default function Home() {
                 </select>
               </div>
 
+              <p className="text-xs text-slate-400 text-center mb-2">매일 11시, 23시 기준으로 데이터가 수집됩니다!</p>
+
               {/* 멤버 리스트 */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 {/* 헤더 */}
@@ -217,6 +357,7 @@ export default function Home() {
                     )}
                     <span className="flex-1 text-sm font-medium text-slate-800 min-w-0 truncate text-center">
                       {m.역할 === '길드마스터' && <span className="mr-1">👑</span>}
+                      {m.역할 === '부길드마스터' && <span className="mr-1" style={{filter:'grayscale(1) brightness(0.4)'}}>👑</span>}
                       {m.닉네임}
                     </span>
                     <div className="w-10 flex justify-center shrink-0">
@@ -232,9 +373,10 @@ export default function Home() {
                       </span>
                       {(() => {
                         const hasScore = m.용협 && !isNaN(Number(m.용협))
-                        const diff = hasScore ? (diffMap[m.닉네임] ?? 0) : 0
+                        const diff = hasScore ? diffMap[m.닉네임] : null
+                        if (diff === null || diff === undefined) return null
                         return (
-                          <span className={`block text-xs tabular-nums font-medium ${diff < 0 ? 'text-blue-400' : diff > 0 ? 'text-rose-500' : 'text-slate-300'}`}>
+                          <span className={`block text-xs tabular-nums font-medium ${isFriday && diff <= FRIDAY_THRESHOLD ? 'text-slate-900' : diff < 0 ? 'text-blue-400' : diff > 0 ? 'text-rose-500' : 'text-slate-300'}`}>
                             ({diff > 0 ? '+' : ''}{diff.toLocaleString()})
                           </span>
                         )
@@ -277,16 +419,12 @@ export default function Home() {
                 </div>
               )}
 
-              <p className="text-center text-slate-400 text-xs mt-4">1분마다 자동 갱신</p>
-
               <div className="text-center mt-3">
-                <a
-                  href="/admin"
-                  className="text-xs text-slate-500 hover:text-slate-400 transition"
-                >
-                  ⚙️ 관리자
-                </a>
+                <a href="/admin" className="text-xs text-slate-400 hover:text-slate-500 transition">⚙️ 관리자</a>
               </div>
+              {showRequestModal && (
+                <PromotionRequestModal members={members} onClose={() => setShowRequestModal(false)} />
+              )}
             </>
           )}
         </div>
