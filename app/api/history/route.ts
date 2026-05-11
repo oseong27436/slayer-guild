@@ -5,45 +5,36 @@ export interface HistoryEntry {
   weeks: { date: string; score: number | null }[]
 }
 
-const NOTION_TOKEN = process.env.NOTION_TOKEN
-const HISTORY_DB_ID = process.env.NOTION_HISTORY_DB_ID
+const SUPABASE_URL = process.env.SUPABASE_URL!
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!
 
 export async function GET() {
-  const res = await fetch(`https://api.notion.com/v1/databases/${HISTORY_DB_ID}/query`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${NOTION_TOKEN}`,
-      'Notion-Version': '2022-06-28',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      sorts: [{ property: '닉네임', direction: 'ascending' }, { property: '날짜', direction: 'ascending' }],
-      page_size: 100,
-    }),
-    cache: 'no-store',
-  })
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/slayer_history?select=member_name,recorded_date,score&order=member_name.asc,recorded_date.asc`,
+    {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      cache: 'no-store',
+    }
+  )
 
   if (!res.ok) return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
 
-  const data = await res.json()
-  const results = data.results || []
+  const rows: { member_name: string; recorded_date: string; score: number }[] = await res.json()
 
-  // 닉네임별로 날짜/점수 그룹핑
-  const map: Record<string, { date: string; score: number | null }[]> = {}
-  for (const page of results) {
-    const props = page.properties
-    const name = props['닉네임']?.title?.[0]?.plain_text || ''
-    const date = props['날짜']?.date?.start || ''
-    const score = props['점수']?.number ?? null
-    if (!name || !date) continue
-    if (!map[name]) map[name] = []
-    map[name].push({ date, score })
+  const map: Record<string, Map<string, number | null>> = {}
+  for (const row of rows) {
+    if (!map[row.member_name]) map[row.member_name] = new Map()
+    map[row.member_name].set(row.recorded_date, row.score)
   }
 
-  // 날짜순 정렬
-  const entries: HistoryEntry[] = Object.entries(map).map(([닉네임, weeks]) => ({
+  const entries: HistoryEntry[] = Object.entries(map).map(([닉네임, dateMap]) => ({
     닉네임,
-    weeks: weeks.sort((a, b) => a.date.localeCompare(b.date)),
+    weeks: Array.from(dateMap.entries())
+      .map(([date, score]) => ({ date, score }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
   }))
 
   return NextResponse.json(entries)
