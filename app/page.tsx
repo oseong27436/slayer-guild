@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface Member {
   번호: string
@@ -179,7 +180,7 @@ function PromotionRequestModal({ members, onClose }: { members: Member[], onClos
 export default function Home() {
   const [members, setMembers] = useState<Member[]>([])
   const [history, setHistory] = useState<HistoryEntry[]>([])
-  const [tab, setTab] = useState<'전체' | '루나' | '별'>('전체')
+  const [tab, setTab] = useState<'전체' | '루나' | '별' | '성장'>('전체')
   const [sort, setSort] = useState<'기본' | '용협↓' | '승급↓' | '증감↓'>('기본')
   const [loading, setLoading] = useState(true)
   const [showStats, setShowStats] = useState(false)
@@ -266,7 +267,29 @@ export default function Home() {
     { key: '전체' as const, emoji: '⚔️', label: '전체', count: members.length },
     { key: '루나' as const, emoji: '🌙', label: '루나', count: luna.length },
     { key: '별' as const, emoji: '⭐', label: '별', count: star.length },
+    { key: '성장' as const, emoji: '📈', label: '성장', count: null },
   ]
+
+  // 길드 주간 합산 시계열
+  const memberGuildMap = Object.fromEntries(members.map(m => [m.닉네임, m.길드]))
+  const weeklyMap: Record<string, { 루나: number; 별: number }> = {}
+  history.forEach(entry => {
+    const guild = memberGuildMap[entry.닉네임]
+    if (!guild) return
+    entry.weeks.forEach(w => {
+      if (w.score === null) return
+      if (!weeklyMap[w.date]) weeklyMap[w.date] = { 루나: 0, 별: 0 }
+      if (guild === '루나') weeklyMap[w.date].루나 += w.score!
+      if (guild === '별') weeklyMap[w.date].별 += w.score!
+    })
+  })
+  const chartData = Object.entries(weeklyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, scores]) => ({
+      date: date.slice(5), // MM-DD
+      루나: scores.루나,
+      별: scores.별,
+    }))
 
   return (
     <div className="bg-slate-100 min-h-screen">
@@ -309,27 +332,68 @@ export default function Home() {
                       tab === t.key
                         ? t.key === '루나' ? 'bg-purple-600 text-white'
                           : t.key === '별' ? 'bg-yellow-500 text-white'
+                          : t.key === '성장' ? 'bg-emerald-600 text-white'
                           : 'bg-slate-700 text-white'
                         : 'bg-white/80 backdrop-blur-sm text-slate-600 border border-white/60'
                     }`}
                   >
                     <span>{t.emoji}</span>
                     <span>{t.label}</span>
-                    <span className="text-xs opacity-60">({t.count})</span>
+                    {t.count !== null && <span className="text-xs opacity-60">({t.count})</span>}
                   </button>
                 ))}
-                <select
-                  value={sort}
-                  onChange={e => setSort(e.target.value as typeof sort)}
-                  className="bg-white/80 backdrop-blur-sm border border-white/60 text-slate-600 text-xs rounded-xl px-2 py-2 shadow-sm"
-                >
-                  <option>기본</option>
-                  <option>용협↓</option>
-                  <option>승급↓</option>
-                  <option>증감↓</option>
-                </select>
+                {tab !== '성장' && (
+                  <select
+                    value={sort}
+                    onChange={e => setSort(e.target.value as typeof sort)}
+                    className="bg-white/80 backdrop-blur-sm border border-white/60 text-slate-600 text-xs rounded-xl px-2 py-2 shadow-sm"
+                  >
+                    <option>기본</option>
+                    <option>용협↓</option>
+                    <option>승급↓</option>
+                    <option>증감↓</option>
+                  </select>
+                )}
               </div>
 
+              {tab === '성장' ? (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                  <p className="text-xs text-slate-400 text-center mb-4">길드 용협 합산 추이</p>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                      <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                      <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={v => (v / 1000000).toFixed(1) + 'M'} width={36} />
+                      <Tooltip formatter={(v) => typeof v === 'number' ? v.toLocaleString() : String(v)} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Line type="monotone" dataKey="루나" stroke="#9333ea" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="별" stroke="#eab308" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                  {chartData.length > 1 && (() => {
+                    const last = chartData[chartData.length - 1]
+                    const prev = chartData[chartData.length - 2]
+                    const lunaDiff = last.루나 - prev.루나
+                    const starDiff = last.별 - prev.별
+                    return (
+                      <div className="grid grid-cols-2 gap-3 mt-4">
+                        {[
+                          { label: '🌙 루나', total: last.루나, diff: lunaDiff, color: 'text-purple-600' },
+                          { label: '⭐ 별', total: last.별, diff: starDiff, color: 'text-yellow-500' },
+                        ].map(g => (
+                          <div key={g.label} className="bg-slate-50 rounded-xl p-3 text-center">
+                            <div className={`text-xs font-medium mb-1 ${g.color}`}>{g.label}</div>
+                            <div className="text-lg font-bold text-slate-800">{(g.total / 1000000).toFixed(2)}M</div>
+                            <div className={`text-xs mt-0.5 ${g.diff >= 0 ? 'text-rose-500' : 'text-blue-400'}`}>
+                              {g.diff >= 0 ? '+' : ''}{g.diff.toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                </div>
+              ) : (
+              <>
               <p className="text-xs text-slate-400 text-center mb-2">매일 11시, 23시 기준으로 데이터가 수집됩니다!</p>
 
               {/* 멤버 리스트 */}
@@ -425,6 +489,8 @@ export default function Home() {
               {showRequestModal && (
                 <PromotionRequestModal members={members} onClose={() => setShowRequestModal(false)} />
               )}
+            </>
+          )}
             </>
           )}
         </div>
