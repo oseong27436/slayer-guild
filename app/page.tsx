@@ -404,20 +404,32 @@ export default function Home() {
               <p className="text-xs text-slate-400 text-center mb-2">매일 11시, 23시 기준으로 데이터가 수집됩니다!</p>
 
               {/* 길드 합산 카드 */}
-              {(tab === '루나' || tab === '별') && (
-                <div className={`mb-3 rounded-xl px-5 py-4 flex items-center justify-between shadow-sm ${
-                  tab === '루나' ? 'bg-purple-600' : 'bg-yellow-500'
-                }`}>
-                  <div>
-                    <div className="text-xs text-white/70 mb-0.5">{tab === '루나' ? '🌙 루나' : '⭐ 별'} 길드 용협 합산</div>
-                    <div className="text-2xl font-bold text-white tabular-nums">
-                      {(tab === '루나' ? lunaTotal : starTotal).toLocaleString()}
+              {(tab === '전체' || tab === '루나' || tab === '별') && (
+                <div className={`mb-3 ${tab === '전체' ? 'grid grid-cols-2 gap-2' : ''}`}>
+                  {(tab === '전체' || tab === '루나') && (
+                    <div className="rounded-xl px-5 py-4 flex items-center justify-between shadow-sm bg-purple-600">
+                      <div>
+                        <div className="text-xs text-white/70 mb-0.5">🌙 루나 용협 합산</div>
+                        <div className="text-2xl font-bold text-white tabular-nums">{lunaTotal.toLocaleString()}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-white/70 mb-0.5">인원</div>
+                        <div className="text-2xl font-bold text-white">{luna.length}<span className="text-sm font-normal ml-0.5">명</span></div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs text-white/70 mb-0.5">인원</div>
-                    <div className="text-2xl font-bold text-white">{tab === '루나' ? luna.length : star.length}<span className="text-sm font-normal ml-0.5">명</span></div>
-                  </div>
+                  )}
+                  {(tab === '전체' || tab === '별') && (
+                    <div className="rounded-xl px-5 py-4 flex items-center justify-between shadow-sm bg-yellow-500">
+                      <div>
+                        <div className="text-xs text-white/70 mb-0.5">⭐ 별 용협 합산</div>
+                        <div className="text-2xl font-bold text-white tabular-nums">{starTotal.toLocaleString()}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-white/70 mb-0.5">인원</div>
+                        <div className="text-2xl font-bold text-white">{star.length}<span className="text-sm font-normal ml-0.5">명</span></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
