@@ -197,22 +197,6 @@ export default function Home() {
     }).catch(() => setLoading(false))
   }, [])
 
-  // 방문 추적
-  useEffect(() => {
-    let sessionId = localStorage.getItem('slayer_session')
-    if (!sessionId) {
-      sessionId = crypto.randomUUID()
-      localStorage.setItem('slayer_session', sessionId)
-    }
-    const track = () => fetch('/api/track', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId }),
-    }).catch(() => {})
-    track()
-    const interval = setInterval(track, 60_000)
-    return () => clearInterval(interval)
-  }, [])
 
   // 닉네임 → 증감 맵 (오늘 기록이 있을 때만, 같은 주 내 전날 대비)
   const getMonWeek = (dateStr: string) => {

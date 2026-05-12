@@ -5,7 +5,7 @@ import "./globals.css";
 const notoSansKR = Noto_Sans_KR({ subsets: ["latin"], weight: ["400", "500", "700"] });
 
 export const metadata: Metadata = {
-  title: "슬레이어 길드",
+  title: "루나&별 길드",
   description: "루나 & 별 길드 멤버 현황",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };
