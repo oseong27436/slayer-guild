@@ -10,62 +10,6 @@ interface PromotionRequest {
   요청일: string
 }
 
-interface Stats {
-  daily: { date: string; count: number }[]
-  onlineCount: number
-}
-
-function StatsDashboard() {
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetch('/api/stats')
-      .then(r => r.json())
-      .then(data => { setStats(data); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
-
-  if (loading) return <div className="text-slate-500 text-sm text-center py-4">통계 불러오는 중...</div>
-  if (!stats) return null
-
-  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
-  const todayCount = stats.daily.find(d => d.date === today)?.count ?? 0
-  const maxCount = Math.max(...stats.daily.map(d => d.count), 1)
-
-  return (
-    <div className="mb-6 bg-slate-800 rounded-xl p-4">
-      <h2 className="text-sm font-bold text-slate-300 mb-4">📊 접속 현황</h2>
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="bg-slate-700 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-green-400">{stats.onlineCount}</div>
-          <div className="text-xs text-slate-400 mt-0.5">지금 접속 중</div>
-          <div className="text-xs text-slate-500">(5분 이내)</div>
-        </div>
-        <div className="bg-slate-700 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-blue-400">{todayCount}</div>
-          <div className="text-xs text-slate-400 mt-0.5">오늘 방문자</div>
-          <div className="text-xs text-slate-500">(고유 세션)</div>
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        {stats.daily.map(({ date, count }) => (
-          <div key={date} className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 w-20 shrink-0">{date.slice(5)}</span>
-            <div className="flex-1 bg-slate-700 rounded-full h-4 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full flex items-center justify-end pr-1.5 transition-all"
-                style={{ width: `${(count / maxCount) * 100}%` }}
-              >
-                <span className="text-xs text-white font-bold">{count}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 const PROMOTION_ORDER = [
   '스톤', '브론즈', '아이언', '실버', '골드',
@@ -552,7 +496,6 @@ export default function AdminPage() {
         </h1>
 
         {/* 접속 현황 대시보드 — 마스터만 */}
-        {role === 'master' && <StatsDashboard />}
 
         {/* 길드원 관리 버튼 */}
         <div className="grid grid-cols-3 gap-2 mb-6">
