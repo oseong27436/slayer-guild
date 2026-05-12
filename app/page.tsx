@@ -409,26 +409,26 @@ export default function Home() {
               {(tab === '전체' || tab === '루나' || tab === '별') && (
                 <div className={`mb-3 ${tab === '전체' ? 'grid grid-cols-2 gap-2' : ''}`}>
                   {(tab === '전체' || tab === '루나') && (
-                    <div className="rounded-xl px-5 py-4 flex items-center justify-between shadow-sm bg-purple-600">
+                    <div className="rounded-xl px-5 py-4 flex items-center justify-between shadow-sm bg-white border-2 border-purple-400">
                       <div>
-                        <div className="text-xs text-white/70 mb-0.5">🌙 루나 용협 합산</div>
-                        <div className="text-2xl font-bold text-white tabular-nums">{lunaTotal.toLocaleString()}</div>
+                        <div className="text-xs text-purple-400 mb-0.5">🌙 루나 용협 합산</div>
+                        <div className="text-2xl font-bold text-purple-600 tabular-nums">{lunaTotal.toLocaleString()}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs text-white/70 mb-0.5">용협 완료</div>
-                        <div className="text-2xl font-bold text-white">{lunaDone}<span className="text-sm font-normal text-white/70">/{luna.length}명</span></div>
+                        <div className="text-xs text-slate-400 mb-0.5">용협 완료</div>
+                        <div className="text-2xl font-bold text-purple-600">{lunaDone}<span className="text-sm font-normal text-slate-400">/{luna.length}명</span></div>
                       </div>
                     </div>
                   )}
                   {(tab === '전체' || tab === '별') && (
-                    <div className="rounded-xl px-5 py-4 flex items-center justify-between shadow-sm bg-yellow-500">
+                    <div className="rounded-xl px-5 py-4 flex items-center justify-between shadow-sm bg-white border-2 border-yellow-400">
                       <div>
-                        <div className="text-xs text-white/70 mb-0.5">⭐ 별 용협 합산</div>
-                        <div className="text-2xl font-bold text-white tabular-nums">{starTotal.toLocaleString()}</div>
+                        <div className="text-xs text-yellow-500 mb-0.5">⭐ 별 용협 합산</div>
+                        <div className="text-2xl font-bold text-yellow-500 tabular-nums">{starTotal.toLocaleString()}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs text-white/70 mb-0.5">용협 완료</div>
-                        <div className="text-2xl font-bold text-white">{starDone}<span className="text-sm font-normal text-white/70">/{star.length}명</span></div>
+                        <div className="text-xs text-slate-400 mb-0.5">용협 완료</div>
+                        <div className="text-2xl font-bold text-yellow-500">{starDone}<span className="text-sm font-normal text-slate-400">/{star.length}명</span></div>
                       </div>
                     </div>
                   )}
