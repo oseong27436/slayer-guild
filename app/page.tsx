@@ -337,7 +337,7 @@ export default function Home() {
                   <button
                     key={t.key}
                     onClick={() => setTab(t.key)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm ${
+                    className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-medium transition-all shadow-sm whitespace-nowrap ${
                       tab === t.key
                         ? t.key === '루나' ? 'bg-purple-600 text-white'
                           : t.key === '별' ? 'bg-yellow-500 text-white'
@@ -348,7 +348,7 @@ export default function Home() {
                   >
                     <span>{t.emoji}</span>
                     <span>{t.label}</span>
-                    {t.count !== null && <span className="text-xs opacity-60">({t.count})</span>}
+                    {t.count !== null && <span className="opacity-60">({t.count})</span>}
                   </button>
                 ))}
                 {tab !== '성장' && (
@@ -410,13 +410,13 @@ export default function Home() {
                 <div className={`mb-3 ${tab === '전체' ? 'grid grid-cols-2 gap-2' : ''}`}>
                   {(tab === '전체' || tab === '루나') && (
                     <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-purple-400">
-                      <div className="text-xs text-purple-400 mb-1">🌙 루나 용협 합산 · {lunaDone}/{luna.length}명</div>
+                      <div className="text-xs text-purple-400 mb-1 whitespace-nowrap">🌙 루나 · {lunaDone}/{luna.length}명 완료</div>
                       <div className="text-xl font-bold text-purple-600 tabular-nums">{lunaTotal.toLocaleString()}</div>
                     </div>
                   )}
                   {(tab === '전체' || tab === '별') && (
                     <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-yellow-400">
-                      <div className="text-xs text-yellow-500 mb-1">⭐ 별 용협 합산 · {starDone}/{star.length}명</div>
+                      <div className="text-xs text-yellow-500 mb-1 whitespace-nowrap">⭐ 별 · {starDone}/{star.length}명 완료</div>
                       <div className="text-xl font-bold text-yellow-500 tabular-nums">{starTotal.toLocaleString()}</div>
                     </div>
                   )}
