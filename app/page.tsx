@@ -245,6 +245,8 @@ export default function Home() {
 
   const luna = members.filter(m => m.길드 === '루나')
   const star = members.filter(m => m.길드 === '별')
+  const lunaTotal = luna.reduce((s, m) => s + (Number(m.용협) || 0), 0)
+  const starTotal = star.reduce((s, m) => s + (Number(m.용협) || 0), 0)
   const filtered = tab === '전체' ? members : members.filter(m => m.길드 === tab)
   const lunaAvg = getAvgPromotion(luna)
   const starAvg = getAvgPromotion(star)
@@ -400,6 +402,24 @@ export default function Home() {
               ) : (
               <>
               <p className="text-xs text-slate-400 text-center mb-2">매일 11시, 23시 기준으로 데이터가 수집됩니다!</p>
+
+              {/* 길드 합산 카드 */}
+              {(tab === '루나' || tab === '별') && (
+                <div className={`mb-3 rounded-xl px-5 py-4 flex items-center justify-between shadow-sm ${
+                  tab === '루나' ? 'bg-purple-600' : 'bg-yellow-500'
+                }`}>
+                  <div>
+                    <div className="text-xs text-white/70 mb-0.5">{tab === '루나' ? '🌙 루나' : '⭐ 별'} 길드 용협 합산</div>
+                    <div className="text-2xl font-bold text-white tabular-nums">
+                      {(tab === '루나' ? lunaTotal : starTotal).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-white/70 mb-0.5">인원</div>
+                    <div className="text-2xl font-bold text-white">{tab === '루나' ? luna.length : star.length}<span className="text-sm font-normal ml-0.5">명</span></div>
+                  </div>
+                </div>
+              )}
 
               {/* 멤버 리스트 */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
