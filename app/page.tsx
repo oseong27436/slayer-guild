@@ -247,6 +247,8 @@ export default function Home() {
   const star = members.filter(m => m.길드 === '별')
   const lunaTotal = luna.reduce((s, m) => s + (Number(m.용협) || 0), 0)
   const starTotal = star.reduce((s, m) => s + (Number(m.용협) || 0), 0)
+  const lunaDone = luna.filter(m => Number(m.용협) > 0).length
+  const starDone = star.filter(m => Number(m.용협) > 0).length
   const filtered = tab === '전체' ? members : members.filter(m => m.길드 === tab)
   const lunaAvg = getAvgPromotion(luna)
   const starAvg = getAvgPromotion(star)
@@ -413,8 +415,8 @@ export default function Home() {
                         <div className="text-2xl font-bold text-white tabular-nums">{lunaTotal.toLocaleString()}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs text-white/70 mb-0.5">인원</div>
-                        <div className="text-2xl font-bold text-white">{luna.length}<span className="text-sm font-normal ml-0.5">명</span></div>
+                        <div className="text-xs text-white/70 mb-0.5">용협 완료</div>
+                        <div className="text-2xl font-bold text-white">{lunaDone}<span className="text-sm font-normal text-white/70">/{luna.length}명</span></div>
                       </div>
                     </div>
                   )}
@@ -425,8 +427,8 @@ export default function Home() {
                         <div className="text-2xl font-bold text-white tabular-nums">{starTotal.toLocaleString()}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs text-white/70 mb-0.5">인원</div>
-                        <div className="text-2xl font-bold text-white">{star.length}<span className="text-sm font-normal ml-0.5">명</span></div>
+                        <div className="text-xs text-white/70 mb-0.5">용협 완료</div>
+                        <div className="text-2xl font-bold text-white">{starDone}<span className="text-sm font-normal text-white/70">/{star.length}명</span></div>
                       </div>
                     </div>
                   )}
