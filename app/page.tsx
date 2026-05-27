@@ -327,7 +327,6 @@ export default function Home() {
   const filtered = tab === '전체' ? members : members.filter(m => m.길드 === tab)
   const lunaAvg = getAvgPromotion(luna)
   const starAvg = getAvgPromotion(star)
-  const allAvg = getAvgPromotion(members)
 
   const sorted = [...filtered].sort((a, b) => {
     if (sort === '용협↓') return (Number(b.용협) || 0) - (Number(a.용협) || 0)
@@ -630,11 +629,10 @@ export default function Home() {
 
               {showStats && (
                 <div className="mt-2 bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-4">
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {[
                       { label: '🌙 루나', count: luna.length, avg: lunaAvg, bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600' },
                       { label: '⭐ 별', count: star.length, avg: starAvg, bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-600' },
-                      { label: '⚔️ 전체', count: members.length, avg: allAvg, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-500' },
                     ].map(c => (
                       <div key={c.label} className={`${c.bg} border ${c.border} rounded-lg p-3 text-center`}>
                         <div className={`${c.text} text-xs font-medium mb-2`}>{c.label}</div>
