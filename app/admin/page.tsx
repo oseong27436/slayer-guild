@@ -338,6 +338,86 @@ function EditMemberModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function HeroBannerModal({ onClose }: { onClose: () => void }) {
+  const [images, setImages] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+
+  const load = () => {
+    fetch('/api/hero-images').then(r => r.json()).then(setImages).catch(() => {})
+  }
+
+  useEffect(() => { load() }, [])
+
+  const upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const form = new FormData()
+    form.append('file', file)
+    await fetch('/api/hero-images', { method: 'POST', body: form })
+    setUploading(false)
+    e.target.value = ''
+    load()
+  }
+
+  const remove = async (url: string) => {
+    const name = decodeURIComponent(url.split('/').pop() || '')
+    await fetch('/api/hero-images', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    setConfirmDelete(null)
+    load()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4" onClick={onClose}>
+      <div className="bg-slate-800 rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="px-5 pt-5 pb-5">
+          <h2 className="text-base font-bold text-white mb-4 text-center">🖼 배너 이미지 관리</h2>
+
+          {images.length === 0 ? (
+            <p className="text-slate-500 text-sm text-center py-4">등록된 이미지 없음</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {images.map(url => (
+                <div key={url} className="relative rounded-lg overflow-hidden bg-slate-700 aspect-video">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  {confirmDelete === url ? (
+                    <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-2 p-2">
+                      <p className="text-white text-xs text-center">삭제할까요?</p>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => setConfirmDelete(null)} className="px-2 py-1 rounded bg-slate-600 text-xs text-white">취소</button>
+                        <button onClick={() => remove(url)} className="px-2 py-1 rounded bg-red-600 text-xs text-white">삭제</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(url)}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-red-700"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <label className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition ${uploading ? 'bg-slate-700 text-slate-500' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}>
+            {uploading ? '업로드 중...' : '📁 이미지 추가'}
+            <input type="file" accept="image/*" className="hidden" onChange={upload} disabled={uploading} />
+          </label>
+
+          <button onClick={onClose} className="w-full mt-2 py-2.5 rounded-xl text-sm text-slate-400 bg-slate-700">닫기</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ReorderModal({ onClose }: { onClose: () => void }) {
   const [members, setMembers] = useState<MemberWithId[]>([])
   const [order, setOrder] = useState<MemberWithId[]>([])
@@ -433,6 +513,7 @@ export default function AdminPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showReorderModal, setShowReorderModal] = useState(false)
+  const [showBannerModal, setShowBannerModal] = useState(false)
 
   useEffect(() => {
     const match = document.cookie.split(';').find(c => c.trim().startsWith('admin_role='))
@@ -498,14 +579,16 @@ export default function AdminPage() {
         {/* 접속 현황 대시보드 — 마스터만 */}
 
         {/* 길드원 관리 버튼 */}
-        <div className="grid grid-cols-3 gap-2 mb-6">
+        <div className="grid grid-cols-3 gap-2 mb-2">
           <button onClick={() => setShowAddModal(true)} className="py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium transition">👤 추가</button>
           <button onClick={() => setShowEditModal(true)} className="py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium transition">✏️ 수정</button>
           <button onClick={() => setShowReorderModal(true)} className="py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium transition">🔢 순서</button>
         </div>
+        <button onClick={() => setShowBannerModal(true)} className="w-full py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium transition mb-6">🖼 배너 이미지 관리</button>
         {showAddModal && <AddMemberModal onClose={() => setShowAddModal(false)} />}
         {showEditModal && <EditMemberModal onClose={() => setShowEditModal(false)} />}
         {showReorderModal && <ReorderModal onClose={() => setShowReorderModal(false)} />}
+        {showBannerModal && <HeroBannerModal onClose={() => setShowBannerModal(false)} />}
 
         {/* 승급 변경 요청 */}
         {requests.length > 0 && (

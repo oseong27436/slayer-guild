@@ -11,11 +11,12 @@ interface Member {
   승급: string
   역할: string
   용협: string
+  promotion_warning_since: string | null
 }
 
 interface HistoryEntry {
   닉네임: string
-  weeks: { date: string; score: number | null }[]
+  weeks: { date: string; score: number | null; guild: string | null }[]
 }
 
 const PROMOTION_ORDER = [
@@ -36,31 +37,60 @@ const HAS_IMAGE = new Set([
 ])
 
 function getAvgPromotion(members: Member[]) {
-  const indices = members.map(m => PROMOTION_ORDER.indexOf(m.승급)).filter(i => i >= 0)
-  if (!indices.length) return null
-  return PROMOTION_ORDER[Math.round(indices.reduce((a, b) => a + b, 0) / indices.length)]
+  const indices = members.map(m => PROMOTION_ORDER.indexOf(m.승급)).filter(i => i >= 0).sort((a, b) => a - b)
+  if (indices.length <= 4) return null
+  const trimmed = indices.slice(2, -2)
+  return PROMOTION_ORDER[Math.round(trimmed.reduce((a, b) => a + b, 0) / trimmed.length)]
 }
 
-function DistributionChart({ members }: { members: Member[] }) {
-  const dist: Record<string, number> = {}
-  members.forEach(m => { if (m.승급) dist[m.승급] = (dist[m.승급] || 0) + 1 })
-  const sorted = PROMOTION_ORDER.filter(p => dist[p]).map(p => ({ name: p, count: dist[p] })).reverse()
-  const max = Math.max(...sorted.map(s => s.count), 1)
+function DistributionChart({ members, tab }: { members: Member[]; tab: string }) {
+  const dist: Record<string, { total: number; luna: number; star: number }> = {}
+  members.forEach(m => {
+    if (!m.승급) return
+    if (!dist[m.승급]) dist[m.승급] = { total: 0, luna: 0, star: 0 }
+    dist[m.승급].total++
+    if (m.길드 === '루나') dist[m.승급].luna++
+    else if (m.길드 === '별') dist[m.승급].star++
+  })
+  const sorted = PROMOTION_ORDER.filter(p => dist[p]).map(p => ({ name: p, ...dist[p] })).reverse()
+  const max = Math.max(...sorted.map(s => s.total), 1)
+
+  const barColor = tab === '루나'
+    ? 'bg-gradient-to-r from-purple-500 to-violet-400'
+    : tab === '별'
+    ? 'bg-gradient-to-r from-yellow-400 to-amber-400'
+    : null
+
   return (
-    <div className="space-y-1.5">
-      {sorted.map(({ name, count }) => (
+    <div className="space-y-2">
+      {sorted.map(({ name, total, luna, star }) => (
         <div key={name} className="flex items-center gap-2">
-          <div className="w-24 flex items-center justify-end gap-1 shrink-0">
-            {HAS_IMAGE.has(name) && <Image src={`/promotion/${name}.webp`} alt={name} width={14} height={14} />}
-            <span className="text-xs text-slate-500">{name}</span>
+          <div className="w-32 flex items-center justify-end gap-1.5 shrink-0">
+            {HAS_IMAGE.has(name) && <Image src={`/promotion/${name}.webp`} alt={name} width={20} height={20} />}
+            <span className="text-xs text-slate-500 truncate">{name}</span>
           </div>
-          <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-purple-500 to-violet-400 rounded-full flex items-center justify-end pr-1.5"
-              style={{ width: `${(count / max) * 100}%` }}
-            >
-              <span className="text-xs text-white font-bold">{count}</span>
-            </div>
+          <div className="flex-1 bg-slate-100 rounded-full h-6 overflow-hidden">
+            {barColor ? (
+              <div
+                className={`h-full ${barColor} rounded-full flex items-center justify-end pr-2`}
+                style={{ width: `${(total / max) * 100}%` }}
+              >
+                <span className="text-xs text-white font-bold">{total}</span>
+              </div>
+            ) : (
+              <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${(total / max) * 100}%` }}>
+                {luna > 0 && (
+                  <div className="h-full bg-gradient-to-r from-purple-500 to-violet-400 flex items-center justify-end" style={{ flex: luna }}>
+                    {star === 0 && <span className="text-xs text-white font-bold pr-2">{total}</span>}
+                  </div>
+                )}
+                {star > 0 && (
+                  <div className="h-full bg-gradient-to-r from-yellow-400 to-amber-400 flex items-center justify-end" style={{ flex: star }}>
+                    <span className="text-xs text-white font-bold pr-2">{total}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       ))}
@@ -177,14 +207,67 @@ function PromotionRequestModal({ members, onClose }: { members: Member[], onClos
   )
 }
 
+function WarningTimer({ since }: { since: string }) {
+  const DEADLINE = 7 * 24 * 60 * 60 * 1000
+  const [remaining, setRemaining] = useState(() => {
+    const elapsed = Date.now() - new Date(since).getTime()
+    return Math.max(0, DEADLINE - elapsed)
+  })
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - new Date(since).getTime()
+      setRemaining(Math.max(0, DEADLINE - elapsed))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [since])
+
+  const totalSec = Math.floor(remaining / 1000)
+  const days = Math.floor(totalSec / 86400)
+  const hours = Math.floor((totalSec % 86400) / 3600)
+  const mins = Math.floor((totalSec % 3600) / 60)
+  const secs = totalSec % 60
+
+  const pad = (n: number) => n.toString().padStart(2, '0')
+
+  if (remaining <= 0) return <span className="text-xs font-bold text-red-500">방출 대상</span>
+
+  return (
+    <span className="text-xs font-mono text-red-500 tabular-nums">
+      {days > 0 ? `${days}일 ` : ''}{pad(hours)}:{pad(mins)}:{pad(secs)}
+    </span>
+  )
+}
+
+const FALLBACK_IMAGES = ['/hero.png', '/hero2.png']
+
 export default function Home() {
   const [members, setMembers] = useState<Member[]>([])
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [tab, setTab] = useState<'전체' | '루나' | '별' | '성장'>('전체')
   const [sort, setSort] = useState<'기본' | '용협↓' | '승급↓' | '증감↓'>('기본')
+  const [seasonTab, setSeasonTab] = useState<'s3' | 's4'>('s4')
   const [loading, setLoading] = useState(true)
   const [showStats, setShowStats] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
+  const [heroImage, setHeroImage] = useState('/hero.png')
+  const [heroVisible, setHeroVisible] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/hero-images')
+      .then(r => r.json())
+      .then((images: string[]) => {
+        const pool = images.length > 0 ? images : FALLBACK_IMAGES
+        const picked = pool[Math.floor(Math.random() * pool.length)]
+        if (picked === heroImage) return
+        setHeroVisible(false)
+        setTimeout(() => {
+          setHeroImage(picked)
+          setHeroVisible(true)
+        }, 300)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -213,7 +296,7 @@ export default function Home() {
 
   const diffMap: Record<string, number | null> = {}
   history.forEach(entry => {
-    const valid = entry.weeks.filter((w): w is { date: string; score: number } => w.score !== null)
+    const valid = entry.weeks.filter((w): w is { date: string; score: number; guild: string | null } => w.score !== null)
     if (valid.length >= 2) {
       const last = valid[valid.length - 1]
       const prev = valid[valid.length - 2]
@@ -231,11 +314,20 @@ export default function Home() {
   const star = members.filter(m => m.길드 === '별')
   const lunaTotal = luna.reduce((s, m) => s + (Number(m.용협) || 0), 0)
   const starTotal = star.reduce((s, m) => s + (Number(m.용협) || 0), 0)
-  const lunaDone = luna.filter(m => Number(m.용협) > 0).length
-  const starDone = star.filter(m => Number(m.용협) > 0).length
+  const lunaDone = luna.filter(m => {
+    const diff = diffMap[m.닉네임]
+    if (diff === null || diff === undefined) return false
+    return isFriday ? diff > FRIDAY_THRESHOLD : diff > 0
+  }).length
+  const starDone = star.filter(m => {
+    const diff = diffMap[m.닉네임]
+    if (diff === null || diff === undefined) return false
+    return isFriday ? diff > FRIDAY_THRESHOLD : diff > 0
+  }).length
   const filtered = tab === '전체' ? members : members.filter(m => m.길드 === tab)
   const lunaAvg = getAvgPromotion(luna)
   const starAvg = getAvgPromotion(star)
+  const allAvg = getAvgPromotion(members)
 
   const sorted = [...filtered].sort((a, b) => {
     if (sort === '용협↓') return (Number(b.용협) || 0) - (Number(a.용협) || 0)
@@ -258,39 +350,66 @@ export default function Home() {
     { key: '성장' as const, emoji: '📈', label: '성장', count: null },
   ]
 
-  // 길드 주간 합산 시계열
-  const memberGuildMap = Object.fromEntries(members.map(m => [m.닉네임, m.길드]))
+  const SEASON_3_START = '2026-02-23'
+  const SEASON_3_END   = '2026-05-18'
+  const SEASON_4_START = '2026-06-01'
+  const SEASON_4_END   = '2026-08-24'
+
+  // 길드 일별 합산 시계열 (기록 당시 길드 기준)
   const weeklyMap: Record<string, { 루나: number; 별: number }> = {}
   history.forEach(entry => {
-    const guild = memberGuildMap[entry.닉네임]
-    if (!guild) return
     entry.weeks.forEach(w => {
       if (w.score === null) return
+      const guild = w.guild
+      if (!guild) return
       if (!weeklyMap[w.date]) weeklyMap[w.date] = { 루나: 0, 별: 0 }
       if (guild === '루나') weeklyMap[w.date].루나 += w.score!
       if (guild === '별') weeklyMap[w.date].별 += w.score!
     })
   })
-  // 최근 7주 일요일 고정
-  const last7Sundays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date()
-    const day = d.getDay()
-    d.setDate(d.getDate() - (day === 0 ? 0 : day) - (6 - i) * 7)
-    return d.toISOString().slice(0, 10)
+
+  // 시즌 전체 주 목록 생성 (데이터 없는 주도 0으로 포함)
+  const allDates = Object.keys(weeklyMap).sort()
+  const seasonStart = seasonTab === 's3' ? SEASON_3_START : SEASON_4_START
+  const seasonEnd   = seasonTab === 's3' ? SEASON_3_END   : SEASON_4_END
+
+  const seasonMondays: string[] = []
+  const cursor = new Date(seasonStart)
+  const dow = cursor.getDay()
+  cursor.setDate(cursor.getDate() - (dow === 0 ? 6 : dow - 1))
+  while (cursor.toISOString().slice(0, 10) <= seasonEnd) {
+    seasonMondays.push(cursor.toISOString().slice(0, 10))
+    cursor.setDate(cursor.getDate() + 7)
+  }
+
+  const chartData = seasonMondays.map(mon => {
+    const endOfWeek = new Date(mon)
+    endOfWeek.setDate(endOfWeek.getDate() + 6)
+    const endStr = endOfWeek.toISOString().slice(0, 10)
+    const weekDates = allDates.filter(d => d >= mon && d <= endStr)
+    const best = weekDates[weekDates.length - 1]
+    return {
+      date: mon.slice(5),
+      루나: best ? (weeklyMap[best]?.루나 ?? 0) : 0,
+      별: best ? (weeklyMap[best]?.별 ?? 0) : 0,
+    }
   })
-  const chartData = last7Sundays.map(date => ({
-    date: date.slice(5),
-    루나: weeklyMap[date]?.루나 ?? 0,
-    별: weeklyMap[date]?.별 ?? 0,
-  }))
 
   return (
     <div className="bg-slate-100 min-h-screen">
       {/* 히어로 + 콘텐츠가 하나의 흐름 */}
       <div className="relative">
         {/* 히어로 이미지 */}
-        <div className="relative w-full" style={{ height: '100svh' }}>
-          <Image src="/hero.png" alt="hero" fill className="object-cover object-center" priority unoptimized />
+        <div className="relative w-full h-[30svh] md:h-[100svh]">
+          <Image
+            src={heroImage}
+            alt="hero"
+            fill
+            className="object-cover object-center transition-opacity duration-300"
+            style={{ opacity: heroVisible ? 1 : 0 }}
+            priority
+            unoptimized
+          />
           {/* 아래쪽 넓게 페이드 */}
           <div
             className="absolute inset-0"
@@ -300,8 +419,7 @@ export default function Home() {
 
         {/* 콘텐츠: 히어로 안쪽 그라디언트 위에 겹침 */}
         <div
-          className="relative max-w-2xl mx-auto px-3 pb-8"
-          style={{ marginTop: 'calc(-100svh * 0.28)' }}
+          className="relative max-w-2xl mx-auto px-3 pb-8 mt-[-8svh] md:mt-[-28svh]"
         >
           {loading ? (
             <div className="text-center text-slate-400 py-16 text-sm">불러오는 중...</div>
@@ -351,6 +469,29 @@ export default function Home() {
 
               {tab === '성장' ? (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                  {/* 시즌 서브탭 */}
+                  <div className="flex gap-2 mb-4">
+                    {([
+                      { key: 's3' as const, label: '시즌 3', sub: '~ 5/16' },
+                      { key: 's4' as const, label: '시즌 4', sub: '6/1 ~' },
+                    ]).map(s => (
+                      <button
+                        key={s.key}
+                        onClick={() => setSeasonTab(s.key)}
+                        className={`flex-1 py-2 rounded-xl text-xs font-medium transition flex flex-col items-center gap-0.5 ${
+                          seasonTab === s.key
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        <span>{s.label}</span>
+                        <span className={`text-[10px] ${seasonTab === s.key ? 'text-emerald-200' : 'text-slate-400'}`}>{s.sub}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {chartData.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-16">아직 기록이 없어요</p>
+                  ) : (<>
                   <p className="text-xs text-slate-400 text-center mb-4">길드 용협 합산 추이</p>
                   <ResponsiveContainer width="100%" height={280}>
                     <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
@@ -384,6 +525,7 @@ export default function Home() {
                       </div>
                     )
                   })()}
+                  </>)}
                 </div>
               ) : (
               <>
@@ -421,20 +563,31 @@ export default function Home() {
                   <div
                     key={i}
                     className={`flex items-center px-4 py-3.5 border-b border-slate-100 last:border-0 ${
-                      m.길드 === '루나' ? 'bg-purple-50/40' : 'bg-yellow-50/40'
+                      m.promotion_warning_since
+                        ? 'bg-red-100/70'
+                        : m.길드 === '루나' ? 'bg-purple-50/40' : 'bg-yellow-50/40'
                     }`}
                   >
                     <span className="w-6 text-xs text-slate-400 shrink-0">{m.idx}</span>
                     {tab === '전체' && (
-                      <span className={`w-10 text-xs font-bold shrink-0 text-center ${m.길드 === '루나' ? 'text-purple-500' : 'text-yellow-500'}`}>
+                      <span className={`w-10 text-xs font-bold shrink-0 text-center ${m.promotion_warning_since ? 'text-red-500' : m.길드 === '루나' ? 'text-purple-500' : 'text-yellow-500'}`}>
                         {m.길드}
                       </span>
                     )}
-                    <span className="flex-1 text-sm font-medium text-slate-800 min-w-0 truncate text-center">
-                      {m.역할 === '길드마스터' && <span className="mr-1">👑</span>}
-                      {m.역할 === '부길드마스터' && <span className="mr-1" style={{filter:'grayscale(1) brightness(0.75)'}}>👑</span>}
-                      {m.닉네임}
-                    </span>
+                    <div className="flex-1 flex flex-col items-center min-w-0">
+                      <span className={`text-[15px] truncate ${
+                        m.역할 === '길드마스터'
+                          ? 'font-bold text-slate-900'
+                          : 'font-semibold text-slate-800'
+                      }`}>
+                        {m.역할 === '길드마스터' && <span className="mr-1">👑</span>}
+                        {m.역할 === '부길드마스터' && <span className="mr-1" style={{filter:'grayscale(1) brightness(0.75)'}}>👑</span>}
+                        {m.닉네임}
+                      </span>
+                      {m.promotion_warning_since && (
+                        <WarningTimer since={m.promotion_warning_since} />
+                      )}
+                    </div>
                     <div className="w-10 flex justify-center shrink-0">
                       {HAS_IMAGE.has(m.승급) ? (
                         <Image src={`/promotion/${m.승급}.webp`} alt={m.승급} width={28} height={28} title={m.승급} />
@@ -443,7 +596,7 @@ export default function Home() {
                       ) : null}
                     </div>
                     <div className="w-28 text-center shrink-0">
-                      <span className="text-sm text-slate-700 tabular-nums font-bold">
+                      <span className="text-sm text-slate-900 tabular-nums font-bold">
                         {(() => { const n = Number(m.용협); return (!m.용협 || isNaN(n)) ? '-' : n.toLocaleString() })()}
                       </span>
                       {(() => {
@@ -466,7 +619,12 @@ export default function Home() {
                 onClick={() => setShowStats(s => !s)}
                 className="w-full mt-3 py-2.5 rounded-xl bg-white border border-slate-200 text-sm text-slate-500 flex items-center justify-center gap-2 shadow-sm"
               >
-                <span className={`transition-transform inline-block ${showStats ? 'rotate-90' : ''}`}>▶</span>
+                <svg
+                  className={`w-4 h-4 transition-transform ${showStats ? 'rotate-180' : ''}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
                 승급 분포 / 통계
               </button>
 
@@ -476,21 +634,21 @@ export default function Home() {
                     {[
                       { label: '🌙 루나', count: luna.length, avg: lunaAvg, bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600' },
                       { label: '⭐ 별', count: star.length, avg: starAvg, bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-600' },
-                      { label: '⚔️ 전체', count: members.length, avg: null, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-500' },
+                      { label: '⚔️ 전체', count: members.length, avg: allAvg, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-500' },
                     ].map(c => (
-                      <div key={c.label} className={`${c.bg} border ${c.border} rounded-lg p-2.5 text-center`}>
-                        <div className={`${c.text} text-xs font-medium mb-1`}>{c.label}</div>
-                        <div className="text-xl font-bold text-slate-800">{c.count}<span className="text-xs text-slate-400 ml-0.5">명</span></div>
+                      <div key={c.label} className={`${c.bg} border ${c.border} rounded-lg p-3 text-center`}>
+                        <div className={`${c.text} text-xs font-medium mb-2`}>{c.label}</div>
                         {c.avg && (
-                          <div className="flex flex-col items-center mt-1.5 gap-0.5">
-                            {HAS_IMAGE.has(c.avg) && <Image src={`/promotion/${c.avg}.webp`} alt={c.avg} width={28} height={28} />}
-                            <span className="text-xs text-slate-500">{c.avg}</span>
+                          <div className="flex flex-col items-center gap-1 mb-2">
+                            {HAS_IMAGE.has(c.avg) && <Image src={`/promotion/${c.avg}.webp`} alt={c.avg} width={40} height={40} />}
+                            <span className="text-sm font-bold text-slate-800">{c.avg}</span>
                           </div>
                         )}
+                        <div className="text-sm text-slate-500">{c.count}<span className="text-xs ml-0.5">명</span></div>
                       </div>
                     ))}
                   </div>
-                  <DistributionChart members={members} />
+                  <DistributionChart members={members} tab={tab} />
                 </div>
               )}
 

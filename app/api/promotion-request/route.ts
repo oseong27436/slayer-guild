@@ -5,12 +5,22 @@ const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY!
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID
 
-async function telegramSend(text: string) {
+async function telegramSendWithButtons(text: string, id: string, 닉네임: string, 요청승급: string) {
   if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return
   await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text }),
+    body: JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text,
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '✅ 승인', callback_data: `approve:${id}` },
+          { text: '❌ 거부', callback_data: `reject:${id}` },
+        ]],
+      },
+    }),
   }).catch(() => {})
 }
 
@@ -26,12 +36,19 @@ export async function POST(req: Request) {
       apikey: SUPABASE_KEY,
       Authorization: `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
     },
     body: JSON.stringify({ 닉네임, 현재승급: 현재승급 || '미확인', 요청승급, 상태: '대기', 요청일: today }),
   })
   if (!res.ok) return NextResponse.json({ error: '저장 실패' }, { status: 500 })
 
-  await telegramSend(`⬆️ 승급 변경 요청\n\n${닉네임}: ${현재승급 || '?'} → ${요청승급}\n\n슬레이어 길드 관리자 페이지에서 승인해주세요.`)
+  const rows: { id: string }[] = await res.json()
+  const id = rows[0]?.id ?? 'unknown'
+
+  await telegramSendWithButtons(
+    `⬆️ <b>승급 변경 요청</b>\n\n${닉네임}: ${현재승급 || '?'} → ${요청승급}`,
+    id, 닉네임, 요청승급
+  )
 
   return NextResponse.json({ ok: true })
 }
