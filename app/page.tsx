@@ -248,6 +248,7 @@ export default function Home() {
   const [sort, setSort] = useState<'기본' | '용협↓' | '승급↓' | '증감↓'>('기본')
   const [seasonTab, setSeasonTab] = useState<'s3' | 's4'>('s4')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [heroImage, setHeroImage] = useState('/hero.png')
@@ -269,7 +270,9 @@ export default function Home() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
+  const loadData = () => {
+    setLoading(true)
+    setLoadError(false)
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 10000)
     Promise.all([
@@ -279,9 +282,13 @@ export default function Home() {
       setMembers(Array.isArray(m) ? m : [])
       setHistory(Array.isArray(h) ? h : [])
       setLoading(false)
-    }).catch(() => setLoading(false))
-      .finally(() => clearTimeout(timeout))
-  }, [])
+    }).catch(() => {
+      setLoading(false)
+      setLoadError(true)
+    }).finally(() => clearTimeout(timeout))
+  }
+
+  useEffect(() => { loadData() }, [])
 
 
   // 닉네임 → 증감 맵 (오늘 기록이 있을 때만, 같은 주 내 전날 대비)
@@ -425,6 +432,11 @@ export default function Home() {
         >
           {loading ? (
             <div className="text-center text-slate-400 py-16 text-sm">불러오는 중...</div>
+          ) : loadError ? (
+            <div className="text-center py-16">
+              <p className="text-slate-400 text-sm mb-3">불러오기 실패</p>
+              <button onClick={loadData} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 shadow-sm">다시 시도</button>
+            </div>
           ) : (
             <>
               {/* 승급 변경 요청 버튼 */}
