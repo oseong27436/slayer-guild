@@ -270,14 +270,17 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
     Promise.all([
-      fetch('/api/members').then(r => r.json()),
-      fetch('/api/history').then(r => r.json()),
+      fetch('/api/members', { signal: controller.signal }).then(r => r.json()),
+      fetch('/api/history', { signal: controller.signal }).then(r => r.json()),
     ]).then(([m, h]) => {
-      setMembers(m)
-      setHistory(h)
+      setMembers(Array.isArray(m) ? m : [])
+      setHistory(Array.isArray(h) ? h : [])
       setLoading(false)
     }).catch(() => setLoading(false))
+      .finally(() => clearTimeout(timeout))
   }, [])
 
 
