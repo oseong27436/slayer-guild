@@ -361,7 +361,7 @@ export default function Home() {
 
   const SEASON_3_START = '2026-02-23'
   const SEASON_3_END   = '2026-05-18'
-  const SEASON_4_START = '2026-06-07'
+  const SEASON_4_START = '2026-06-01'
   const SEASON_4_END   = '2026-08-24'
 
   // 길드 일별 합산 시계열 (기록 당시 길드 기준)
@@ -398,7 +398,7 @@ export default function Home() {
     const weekDates = allDates.filter(d => d >= mon && d <= endStr)
     const best = weekDates[weekDates.length - 1]
     return {
-      date: mon.slice(5),
+      date: endStr.slice(5),
       루나: best ? (weeklyMap[best]?.루나 ?? 0) : 0,
       별: best ? (weeklyMap[best]?.별 ?? 0) : 0,
     }
