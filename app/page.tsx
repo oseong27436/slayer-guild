@@ -413,7 +413,7 @@ export default function Home() {
       {/* 히어로 + 콘텐츠가 하나의 흐름 */}
       <div className="relative">
         {/* 히어로 이미지 */}
-        <div className="relative w-full h-[30svh] md:h-[100svh]">
+        <div className="relative w-full h-[45svh] md:h-[100svh]">
           <Image
             src={heroImage.url}
             alt="hero"
@@ -432,7 +432,7 @@ export default function Home() {
 
         {/* 콘텐츠: 히어로 안쪽 그라디언트 위에 겹침 */}
         <div
-          className="relative max-w-2xl mx-auto px-3 pb-8 mt-[-8svh] md:mt-[-28svh]"
+          className="relative max-w-2xl mx-auto px-3 pb-8 mt-[-12svh] md:mt-[-28svh]"
         >
           {loading ? (
             <div className="text-center text-slate-400 py-16 text-sm">불러오는 중...</div>
