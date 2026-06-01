@@ -375,13 +375,16 @@ function FocalPicker({ src, focalX, focalY, onChange }: {
           </div>
         </div>
       </div>
-      <p className="text-xs text-slate-400">모바일 미리보기</p>
-      <div className="relative w-full overflow-hidden rounded-lg" style={{ aspectRatio: '375/244' }}>
+      <p className="text-xs text-slate-400">모바일 미리보기 (45svh 기준)</p>
+      <div className="relative w-full overflow-hidden rounded-lg" style={{ aspectRatio: '390/380' }}>
         <img
           src={src} alt=""
           className="absolute inset-0 w-full h-full object-cover"
           style={{ objectPosition: `${focalX}% ${focalY}%` }}
         />
+        <div className="absolute bottom-0 left-0 right-0" style={{ height: '26%', background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.55))' }}>
+          <div className="absolute bottom-1 left-0 right-0 text-center text-white/60 text-[10px]">콘텐츠 영역</div>
+        </div>
       </div>
     </div>
   )
