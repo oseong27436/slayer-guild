@@ -239,7 +239,11 @@ function WarningTimer({ since }: { since: string }) {
   )
 }
 
-const FALLBACK_IMAGES = ['/hero.png', '/hero2.png']
+interface HeroImage { url: string; focalX: number; focalY: number }
+const FALLBACK_IMAGES: HeroImage[] = [
+  { url: '/hero.png', focalX: 50, focalY: 50 },
+  { url: '/hero2.png', focalX: 50, focalY: 50 },
+]
 
 export default function Home() {
   const [members, setMembers] = useState<Member[]>([])
@@ -251,16 +255,16 @@ export default function Home() {
   const [loadError, setLoadError] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
-  const [heroImage, setHeroImage] = useState('/hero.png')
+  const [heroImage, setHeroImage] = useState<HeroImage>(FALLBACK_IMAGES[0])
   const [heroVisible, setHeroVisible] = useState(true)
 
   useEffect(() => {
     fetch('/api/hero-images')
       .then(r => r.json())
-      .then((images: string[]) => {
-        const pool = images.length > 0 ? images : FALLBACK_IMAGES
+      .then((images: HeroImage[]) => {
+        const pool = Array.isArray(images) && images.length > 0 ? images : FALLBACK_IMAGES
         const picked = pool[Math.floor(Math.random() * pool.length)]
-        if (picked === heroImage) return
+        if (picked.url === heroImage.url) return
         setHeroVisible(false)
         setTimeout(() => {
           setHeroImage(picked)
@@ -411,11 +415,11 @@ export default function Home() {
         {/* 히어로 이미지 */}
         <div className="relative w-full h-[30svh] md:h-[100svh]">
           <Image
-            src={heroImage}
+            src={heroImage.url}
             alt="hero"
             fill
-            className="object-cover object-center transition-opacity duration-300"
-            style={{ opacity: heroVisible ? 1 : 0 }}
+            className="object-cover transition-opacity duration-300"
+            style={{ opacity: heroVisible ? 1 : 0, objectPosition: `${heroImage.focalX}% ${heroImage.focalY}%` }}
             priority
             unoptimized
           />

@@ -1,6 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+
+interface HeroImage {
+  url: string
+  focalX: number
+  focalY: number
+}
 
 interface PromotionRequest {
   id: string
@@ -338,26 +344,88 @@ function EditMemberModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function FocalPicker({ src, focalX, focalY, onChange }: {
+  src: string; focalX: number; focalY: number
+  onChange: (x: number, y: number) => void
+}) {
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  const handleClick = (e: React.MouseEvent) => {
+    const img = imgRef.current
+    if (!img) return
+    const rect = img.getBoundingClientRect()
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100)
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100)
+    onChange(Math.max(0, Math.min(100, x)), Math.max(0, Math.min(100, y)))
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-slate-400">클릭해서 중심점 설정</p>
+      <div className="relative cursor-crosshair rounded-lg overflow-hidden" onClick={handleClick}>
+        <img ref={imgRef} src={src} alt="" className="w-full block" draggable={false} />
+        <div
+          className="absolute pointer-events-none"
+          style={{ left: `${focalX}%`, top: `${focalY}%`, transform: 'translate(-50%, -50%)' }}
+        >
+          <div className="relative w-7 h-7">
+            <div className="absolute inset-0 rounded-full border-2 border-white bg-purple-500/60 shadow-lg" />
+            <div className="absolute top-1/2 left-0 right-0 h-px bg-white/80 -translate-y-px" />
+            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/80 -translate-x-px" />
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-slate-400">모바일 미리보기</p>
+      <div className="relative w-full overflow-hidden rounded-lg" style={{ aspectRatio: '375/244' }}>
+        <img
+          src={src} alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ objectPosition: `${focalX}% ${focalY}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
 function HeroBannerModal({ onClose }: { onClose: () => void }) {
-  const [images, setImages] = useState<string[]>([])
-  const [uploading, setUploading] = useState(false)
+  const [images, setImages] = useState<HeroImage[]>([])
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingPreview, setPendingPreview] = useState('')
+  const [pendingFX, setPendingFX] = useState(50)
+  const [pendingFY, setPendingFY] = useState(50)
+  const [uploading, setUploading] = useState(false)
+  const [editingImg, setEditingImg] = useState<HeroImage | null>(null)
+  const [editFX, setEditFX] = useState(50)
+  const [editFY, setEditFY] = useState(50)
+  const [saving, setSaving] = useState(false)
 
   const load = () => {
     fetch('/api/hero-images').then(r => r.json()).then(setImages).catch(() => {})
   }
-
   useEffect(() => { load() }, [])
 
-  const upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setPendingFile(file)
+    setPendingFX(50)
+    setPendingFY(50)
+    setPendingPreview(URL.createObjectURL(file))
+    e.target.value = ''
+  }
+
+  const uploadConfirm = async () => {
+    if (!pendingFile) return
     setUploading(true)
     const form = new FormData()
-    form.append('file', file)
+    form.append('file', pendingFile)
+    form.append('focalX', String(pendingFX))
+    form.append('focalY', String(pendingFY))
     await fetch('/api/hero-images', { method: 'POST', body: form })
     setUploading(false)
-    e.target.value = ''
+    setPendingFile(null)
+    setPendingPreview('')
     load()
   }
 
@@ -372,6 +440,58 @@ function HeroBannerModal({ onClose }: { onClose: () => void }) {
     load()
   }
 
+  const saveFocal = async () => {
+    if (!editingImg) return
+    setSaving(true)
+    const filename = decodeURIComponent(editingImg.url.split('/').pop() || '')
+    await fetch('/api/hero-images', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename, focalX: editFX, focalY: editFY }),
+    })
+    setSaving(false)
+    setEditingImg(null)
+    load()
+  }
+
+  if (pendingFile) {
+    return (
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
+        <div className="bg-slate-800 rounded-2xl w-full max-w-sm shadow-xl overflow-y-auto max-h-[90vh]">
+          <div className="px-5 pt-5 pb-5">
+            <h2 className="text-base font-bold text-white mb-4 text-center">중심점 설정</h2>
+            <FocalPicker src={pendingPreview} focalX={pendingFX} focalY={pendingFY} onChange={(x, y) => { setPendingFX(x); setPendingFY(y) }} />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => { setPendingFile(null); setPendingPreview('') }} className="flex-1 py-2.5 rounded-xl text-sm text-slate-400 bg-slate-700">취소</button>
+              <button onClick={uploadConfirm} disabled={uploading} className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-purple-600 text-white disabled:opacity-50">
+                {uploading ? '업로드 중...' : '업로드'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (editingImg) {
+    return (
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
+        <div className="bg-slate-800 rounded-2xl w-full max-w-sm shadow-xl overflow-y-auto max-h-[90vh]">
+          <div className="px-5 pt-5 pb-5">
+            <h2 className="text-base font-bold text-white mb-4 text-center">중심점 수정</h2>
+            <FocalPicker src={editingImg.url} focalX={editFX} focalY={editFY} onChange={(x, y) => { setEditFX(x); setEditFY(y) }} />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setEditingImg(null)} className="flex-1 py-2.5 rounded-xl text-sm text-slate-400 bg-slate-700">취소</button>
+              <button onClick={saveFocal} disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-purple-600 text-white disabled:opacity-50">
+                {saving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4" onClick={onClose}>
       <div className="bg-slate-800 rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -382,33 +502,38 @@ function HeroBannerModal({ onClose }: { onClose: () => void }) {
             <p className="text-slate-500 text-sm text-center py-4">등록된 이미지 없음</p>
           ) : (
             <div className="grid grid-cols-2 gap-2 mb-4">
-              {images.map(url => (
-                <div key={url} className="relative rounded-lg overflow-hidden bg-slate-700 aspect-video">
-                  <img src={url} alt="" className="w-full h-full object-cover" />
-                  {confirmDelete === url ? (
+              {images.map(img => (
+                <div key={img.url} className="relative rounded-lg overflow-hidden bg-slate-700 aspect-video">
+                  <img src={img.url} alt="" className="w-full h-full object-cover" style={{ objectPosition: `${img.focalX}% ${img.focalY}%` }} />
+                  {confirmDelete === img.url ? (
                     <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-2 p-2">
                       <p className="text-white text-xs text-center">삭제할까요?</p>
                       <div className="flex gap-1.5">
                         <button onClick={() => setConfirmDelete(null)} className="px-2 py-1 rounded bg-slate-600 text-xs text-white">취소</button>
-                        <button onClick={() => remove(url)} className="px-2 py-1 rounded bg-red-600 text-xs text-white">삭제</button>
+                        <button onClick={() => remove(img.url)} className="px-2 py-1 rounded bg-red-600 text-xs text-white">삭제</button>
                       </div>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => setConfirmDelete(url)}
-                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-red-700"
-                    >
-                      ✕
-                    </button>
+                    <div className="absolute top-1 right-1 flex gap-1">
+                      <button
+                        onClick={() => { setEditingImg(img); setEditFX(img.focalX); setEditFY(img.focalY) }}
+                        className="w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-purple-700"
+                        title="중심점 수정"
+                      >✥</button>
+                      <button
+                        onClick={() => setConfirmDelete(img.url)}
+                        className="w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-red-700"
+                      >✕</button>
+                    </div>
                   )}
                 </div>
               ))}
             </div>
           )}
 
-          <label className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition ${uploading ? 'bg-slate-700 text-slate-500' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}>
-            {uploading ? '업로드 중...' : '📁 이미지 추가'}
-            <input type="file" accept="image/*" className="hidden" onChange={upload} disabled={uploading} />
+          <label className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition bg-purple-600 hover:bg-purple-500 text-white">
+            📁 이미지 추가
+            <input type="file" accept="image/*" className="hidden" onChange={onFileSelect} />
           </label>
 
           <button onClick={onClose} className="w-full mt-2 py-2.5 rounded-xl text-sm text-slate-400 bg-slate-700">닫기</button>
