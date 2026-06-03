@@ -217,74 +217,110 @@ function PromotionRequestModal({ members, onClose }: { members: Member[], onClos
   )
 }
 
+const LUNA_COLORS = ['#7c3aed','#9333ea','#a855f7','#6d28d9','#c084fc','#8b5cf6','#ddd6fe','#4c1d95','#b197fc','#e879f9']
+const STAR_COLORS  = ['#d97706','#f59e0b','#b45309','#fbbf24','#92400e','#f59e2a','#fde68a','#78350f','#fcd34d','#fb923c']
+
 function GrowthTab({ promotionHistory, members }: { promotionHistory: PromotionHistoryEntry[]; members: Member[] }) {
   const guildMap: Record<string, string> = {}
   const currentNames = new Set<string>()
   members.forEach(m => { if (m.닉네임) { guildMap[m.닉네임] = m.길드; currentNames.add(m.닉네임) } })
 
-  const growthMap: Record<string, { start: string; current: string; levels: number }> = {}
-  ;[...promotionHistory].reverse().forEach(p => {
-    if (!currentNames.has(p.닉네임)) return
+  // 멤버별 날짜-승급 포인트 시리즈 구성
+  const memberMap: Record<string, { guild: string; points: { date: string; rank: number }[] }> = {}
+
+  const sorted = [...promotionHistory]
+    .filter(p => currentNames.has(p.닉네임))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+
+  sorted.forEach(p => {
     const fromIdx = PROMOTION_ORDER.indexOf(p.현재승급)
-    const toIdx = PROMOTION_ORDER.indexOf(p.요청승급)
-    if (toIdx <= fromIdx) return
-    if (!growthMap[p.닉네임]) {
-      growthMap[p.닉네임] = { start: p.현재승급, current: p.요청승급, levels: toIdx - fromIdx }
+    const toIdx   = PROMOTION_ORDER.indexOf(p.요청승급)
+    if (fromIdx < 0 || toIdx < 0) return
+
+    if (!memberMap[p.닉네임]) {
+      memberMap[p.닉네임] = {
+        guild: guildMap[p.닉네임] || '',
+        points: [{ date: p.요청일, rank: fromIdx }],
+      }
+    }
+    const pts  = memberMap[p.닉네임].points
+    const last = pts[pts.length - 1]
+    if (last.date === p.요청일) {
+      last.rank = toIdx
     } else {
-      growthMap[p.닉네임].current = p.요청승급
-      growthMap[p.닉네임].levels += toIdx - fromIdx
+      pts.push({ date: p.요청일, rank: toIdx })
     }
   })
 
-  const growthList = Object.entries(growthMap)
-    .map(([name, d]) => ({ name, guild: guildMap[name] || '', ...d }))
-    .sort((a, b) => b.levels - a.levels)
+  const lunaMembers = Object.entries(memberMap).filter(([, v]) => v.guild === '루나')
+  const starMembers  = Object.entries(memberMap).filter(([, v]) => v.guild === '별')
 
-  const luna = growthList.filter(g => g.guild === '루나')
-  const star = growthList.filter(g => g.guild === '별')
-  const maxLevels = Math.max(...growthList.map(g => g.levels), 1)
+  // y축 범위: 전체 데이터 기준
+  const allRanks = Object.values(memberMap).flatMap(v => v.points.map(p => p.rank))
+  const yMin = allRanks.length ? Math.max(0, Math.min(...allRanks) - 1) : 0
+  const yMax = allRanks.length ? Math.min(25, Math.max(...allRanks) + 1) : 25
 
-  const renderBars = (list: typeof growthList, barClass: string) => (
-    <div className="px-4 py-3 space-y-2.5">
-      {list.map((g, i) => (
-        <div key={g.name} className="flex items-center gap-2">
-          <span className="text-[11px] text-slate-400 w-4 shrink-0 text-right">{i + 1}</span>
-          <span className="text-xs font-medium text-slate-700 w-16 shrink-0 truncate">{g.name}</span>
-          <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
-            <div
-              className={`h-full ${barClass} rounded-full flex items-center justify-end pr-2`}
-              style={{ width: `${Math.max((g.levels / maxLevels) * 100, 8)}%` }}
-            >
-              <span className="text-[10px] text-white font-bold">+{g.levels}</span>
-            </div>
-          </div>
-          {HAS_IMAGE.has(g.current) && (
-            <Image src={`/promotion/${g.current}.webp`} alt={g.current} width={18} height={18} className="shrink-0" />
-          )}
-        </div>
-      ))}
-    </div>
-  )
+  const renderChart = (list: typeof lunaMembers, colors: string[]) => {
+    if (list.length === 0) return <p className="text-xs text-slate-400 text-center py-8">기록 없음</p>
+    return (
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+          <XAxis
+            dataKey="date"
+            type="category"
+            allowDuplicatedCategory={false}
+            tick={{ fontSize: 9, fill: '#94a3b8' }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v: string) => v.slice(5)}
+          />
+          <YAxis
+            domain={[yMin, yMax]}
+            tick={{ fontSize: 9, fill: '#94a3b8' }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v: number) => PROMOTION_ORDER[v]?.slice(0, 4) ?? ''}
+            width={36}
+          />
+          <Tooltip
+            formatter={(value: unknown, name: unknown) => [PROMOTION_ORDER[value as number] ?? String(value), String(name)]}
+            contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
+            labelStyle={{ fontSize: 10, color: '#94a3b8' }}
+          />
+          {list.map(([name, { points }], i) => (
+            <Line
+              key={name}
+              data={points}
+              type="stepAfter"
+              dataKey="rank"
+              name={name}
+              stroke={colors[i % colors.length]}
+              strokeWidth={2}
+              dot={{ r: 3, fill: colors[i % colors.length] }}
+              activeDot={{ r: 5 }}
+              connectNulls
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    )
+  }
 
   return (
     <div className="space-y-3">
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-4 py-2.5 bg-purple-50 border-b border-purple-100 flex items-center justify-between">
           <span className="text-sm font-bold text-purple-600">🌙 루나</span>
-          <span className="text-xs text-purple-400">{luna.length}명</span>
+          <span className="text-xs text-purple-400">{lunaMembers.length}명</span>
         </div>
-        {luna.length === 0
-          ? <p className="text-xs text-slate-400 text-center py-6">기록 없음</p>
-          : renderBars(luna, 'bg-gradient-to-r from-purple-500 to-violet-400')}
+        <div className="px-2 pt-3 pb-2">{renderChart(lunaMembers, LUNA_COLORS)}</div>
       </div>
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-4 py-2.5 bg-yellow-50 border-b border-yellow-100 flex items-center justify-between">
           <span className="text-sm font-bold text-yellow-600">⭐ 별</span>
-          <span className="text-xs text-yellow-400">{star.length}명</span>
+          <span className="text-xs text-yellow-400">{starMembers.length}명</span>
         </div>
-        {star.length === 0
-          ? <p className="text-xs text-slate-400 text-center py-6">기록 없음</p>
-          : renderBars(star, 'bg-gradient-to-r from-yellow-400 to-amber-400')}
+        <div className="px-2 pt-3 pb-2">{renderChart(starMembers, STAR_COLORS)}</div>
       </div>
     </div>
   )
