@@ -53,6 +53,17 @@ function getAvgPromotion(members: Member[]) {
   return PROMOTION_ORDER[Math.round(trimmed.reduce((a, b) => a + b, 0) / trimmed.length)]
 }
 
+function getNextSteps(members: Member[]) {
+  const indices = members.map(m => PROMOTION_ORDER.indexOf(m.승급)).filter(i => i >= 0).sort((a, b) => a - b)
+  if (indices.length <= 4) return null
+  const trimmed = indices.slice(2, -2)
+  const avgValue = trimmed.reduce((a, b) => a + b, 0) / trimmed.length
+  const nextIdx = Math.round(avgValue) + 1
+  if (nextIdx >= PROMOTION_ORDER.length) return null
+  const needed = Math.ceil((nextIdx - 0.5) * trimmed.length) - Math.floor(avgValue * trimmed.length)
+  return { next: PROMOTION_ORDER[nextIdx], steps: Math.max(1, needed) }
+}
+
 function DistributionChart({ members, tab }: { members: Member[]; tab: string }) {
   const dist: Record<string, { total: number; luna: number; star: number }> = {}
   members.forEach(m => {
@@ -529,6 +540,24 @@ export default function Home() {
   const filtered = tab === '전체' ? members : tab === '루나' || tab === '별' ? members.filter(m => m.길드 === tab) : members
   const lunaAvg = getAvgPromotion(luna)
   const starAvg = getAvgPromotion(star)
+  const lunaNext = getNextSteps(luna)
+  const starNext = getNextSteps(star)
+
+  const calcGuildInterval = (guildMembers: Member[]) => {
+    const intervals: number[] = []
+    guildMembers.forEach(m => {
+      const ups = promotionHistory
+        .filter(p => p.닉네임 === m.닉네임)
+        .filter(p => PROMOTION_ORDER.indexOf(p.요청승급) > PROMOTION_ORDER.indexOf(p.현재승급))
+        .sort((a, b) => a.요청일.localeCompare(b.요청일))
+        .filter((p, i, arr) => i === 0 || !(p.현재승급 === arr[i-1].현재승급 && p.요청승급 === arr[i-1].요청승급))
+      for (let i = 1; i < ups.length; i++)
+        intervals.push((new Date(ups[i].요청일).getTime() - new Date(ups[i-1].요청일).getTime()) / 86400000)
+    })
+    return intervals.length ? Math.round(intervals.reduce((s, v) => s + v, 0) / intervals.length) : null
+  }
+  const lunaInterval = calcGuildInterval(luna)
+  const starInterval = calcGuildInterval(star)
 
   const sorted = [...filtered].sort((a, b) => {
     if (sort === '용협↓') return (Number(b.용협) || 0) - (Number(a.용협) || 0)
@@ -843,18 +872,28 @@ export default function Home() {
                 <div className="mt-2 bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-4">
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { label: '🌙 루나', count: luna.length, avg: lunaAvg, bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600' },
-                      { label: '⭐ 별', count: star.length, avg: starAvg, bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-600' },
+                      { label: '🌙 루나', count: luna.length, avg: lunaAvg, next: lunaNext, interval: lunaInterval, bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600' },
+                      { label: '⭐ 별',  count: star.length, avg: starAvg,  next: starNext,  interval: starInterval,  bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-600' },
                     ].map(c => (
                       <div key={c.label} className={`${c.bg} border ${c.border} rounded-lg p-3 text-center`}>
                         <div className={`${c.text} text-xs font-medium mb-2`}>{c.label}</div>
                         {c.avg && (
-                          <div className="flex flex-col items-center gap-1 mb-2">
-                            {HAS_IMAGE.has(c.avg) && <Image src={`/promotion/${c.avg}.webp`} alt={c.avg} width={40} height={40} />}
+                          <div className="flex flex-col items-center gap-1 mb-1">
+                            {HAS_IMAGE.has(c.avg) && <Image src={`/promotion/${c.avg}.webp`} alt={c.avg} width={36} height={36} />}
                             <span className="text-sm font-bold text-slate-800">{c.avg}</span>
                           </div>
                         )}
-                        <div className="text-sm text-slate-500">{c.count}<span className="text-xs ml-0.5">명</span></div>
+                        {c.next && (
+                          <div className="text-[11px] text-slate-500 mb-1">
+                            다음({c.next.next.slice(0, 4)})까지 <span className="font-bold text-slate-700">{c.next.steps}명</span>
+                          </div>
+                        )}
+                        <div className="flex justify-center gap-3 mt-1">
+                          <span className="text-xs text-slate-500">{c.count}명</span>
+                          {c.interval !== null && (
+                            <span className="text-xs text-slate-400">평균 <span className="font-medium text-slate-600">{c.interval}일</span>/승급</span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
