@@ -367,7 +367,7 @@ function MemberExpanded({ member, promotionHistory }: { member: Member; promotio
         </div>
         <div className={`rounded-xl p-3 text-center shadow-sm ${
           isOnFire
-            ? 'bg-white border-2 border-red-400 animate-pulse shadow-red-100 shadow-md'
+            ? 'bg-red-50 border-2 border-red-400 animate-pulse shadow-red-100 shadow-md'
             : 'bg-white'
         }`}>
           <div className="text-xl font-bold text-slate-800">
