@@ -341,7 +341,7 @@ function MemberExpanded({ member, promotionHistory }: { member: Member; promotio
     avgDays = Math.round(intervals.reduce((s, v) => s + v, 0) / intervals.length)
   }
 
-  const recent = [...upHistory].reverse().slice(0, 4)
+  const recent = [...upHistory].reverse()
 
   return (
     <div className="px-4 py-3 bg-slate-50 border-t border-slate-100">
