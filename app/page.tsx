@@ -329,8 +329,8 @@ function GrowthTab({ promotionHistory, members }: { promotionHistory: PromotionH
 function MemberExpanded({ member, promotionHistory }: { member: Member; promotionHistory: PromotionHistoryEntry[] }) {
   const upHistory = promotionHistory
     .filter(p => p.닉네임 === member.닉네임)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at))
     .filter(p => PROMOTION_ORDER.indexOf(p.요청승급) > PROMOTION_ORDER.indexOf(p.현재승급))
+    .sort((a, b) => a.요청일.localeCompare(b.요청일))
     .filter((p, i, arr) => i === 0 || !(p.현재승급 === arr[i-1].현재승급 && p.요청승급 === arr[i-1].요청승급))
 
   let avgDays: number | null = null
