@@ -368,7 +368,7 @@ export default function Home() {
   const [members, setMembers] = useState<Member[]>([])
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [promotionHistory, setPromotionHistory] = useState<PromotionHistoryEntry[]>([])
-  const [tab, setTab] = useState<'전체' | '성장' | '히스토리'>('전체')
+  const [tab, setTab] = useState<'전체' | '루나' | '별' | '히스토리'>('전체')
   const [sort, setSort] = useState<'기본' | '용협↓' | '승급↓' | '증감↓'>('기본')
   const [seasonTab, setSeasonTab] = useState<'s3' | 's4'>('s4')
   const [loading, setLoading] = useState(true)
@@ -460,7 +460,7 @@ export default function Home() {
     if (diff === null || diff === undefined) return false
     return isFriday ? diff > FRIDAY_THRESHOLD : diff > 0
   }).length
-  const filtered = members
+  const filtered = tab === '전체' ? members : tab === '루나' || tab === '별' ? members.filter(m => m.길드 === tab) : members
   const lunaAvg = getAvgPromotion(luna)
   const starAvg = getAvgPromotion(star)
 
@@ -480,7 +480,8 @@ export default function Home() {
 
   const tabs = [
     { key: '전체' as const, emoji: '⚔️', label: '전체', count: members.length },
-    { key: '성장' as const, emoji: '📈', label: '성장', count: null },
+    { key: '루나' as const, emoji: '🌙', label: '루나', count: luna.length },
+    { key: '별' as const, emoji: '⭐', label: '별', count: star.length },
     { key: '히스토리' as const, emoji: '🕐', label: '히스토리', count: null },
   ]
 
@@ -580,7 +581,8 @@ export default function Home() {
                     onClick={() => setTab(t.key)}
                     className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-medium transition-all shadow-sm whitespace-nowrap ${
                       tab === t.key
-                        ? t.key === '성장' ? 'bg-emerald-600 text-white'
+                        ? t.key === '루나' ? 'bg-purple-600 text-white'
+                          : t.key === '별' ? 'bg-yellow-500 text-white'
                           : t.key === '히스토리' ? 'bg-teal-600 text-white'
                           : 'bg-slate-700 text-white'
                         : 'bg-white/80 backdrop-blur-sm text-slate-600 border border-white/60'
@@ -591,7 +593,7 @@ export default function Home() {
                     {t.count !== null && <span className="opacity-60">({t.count})</span>}
                   </button>
                 ))}
-                {tab === '전체' && (
+                {tab !== '히스토리' && (
                   <select
                     value={sort}
                     onChange={e => setSort(e.target.value as typeof sort)}
@@ -665,22 +667,24 @@ export default function Home() {
                   })()}
                   </>)}
                 </div>
-              ) : tab === '성장' ? (
-                <GrowthTab promotionHistory={promotionHistory} members={members} />
               ) : (
               <>
               <p className="text-xs text-slate-400 text-center mb-2">매일 11시, 23시 기준으로 데이터가 수집됩니다!</p>
 
               {/* 길드 합산 카드 */}
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-purple-400">
-                  <div className="text-xs text-purple-400 mb-1 whitespace-nowrap">🌙 루나 · {lunaDone}/{luna.length}명 완료</div>
-                  <div className="text-xl font-bold text-purple-600 tabular-nums">{lunaTotal.toLocaleString()}</div>
-                </div>
-                <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-yellow-400">
-                  <div className="text-xs text-yellow-500 mb-1 whitespace-nowrap">⭐ 별 · {starDone}/{star.length}명 완료</div>
-                  <div className="text-xl font-bold text-yellow-500 tabular-nums">{starTotal.toLocaleString()}</div>
-                </div>
+              <div className={`mb-3 ${tab === '전체' ? 'grid grid-cols-2 gap-2' : ''}`}>
+                {(tab === '전체' || tab === '루나') && (
+                  <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-purple-400">
+                    <div className="text-xs text-purple-400 mb-1 whitespace-nowrap">🌙 루나 · {lunaDone}/{luna.length}명 완료</div>
+                    <div className="text-xl font-bold text-purple-600 tabular-nums">{lunaTotal.toLocaleString()}</div>
+                  </div>
+                )}
+                {(tab === '전체' || tab === '별') && (
+                  <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-yellow-400">
+                    <div className="text-xs text-yellow-500 mb-1 whitespace-nowrap">⭐ 별 · {starDone}/{star.length}명 완료</div>
+                    <div className="text-xl font-bold text-yellow-500 tabular-nums">{starTotal.toLocaleString()}</div>
+                  </div>
+                )}
               </div>
 
               {/* 멤버 리스트 */}
