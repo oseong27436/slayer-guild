@@ -217,6 +217,68 @@ function PromotionRequestModal({ members, onClose }: { members: Member[], onClos
   )
 }
 
+function GrowthTab({ promotionHistory }: { promotionHistory: PromotionHistoryEntry[] }) {
+  const growthMap: Record<string, { start: string; current: string; levels: number }> = {}
+  ;[...promotionHistory].reverse().forEach(p => {
+    const fromIdx = PROMOTION_ORDER.indexOf(p.현재승급)
+    const toIdx = PROMOTION_ORDER.indexOf(p.요청승급)
+    if (toIdx <= fromIdx) return
+    if (!growthMap[p.닉네임]) {
+      growthMap[p.닉네임] = { start: p.현재승급, current: p.요청승급, levels: toIdx - fromIdx }
+    } else {
+      growthMap[p.닉네임].current = p.요청승급
+      growthMap[p.닉네임].levels += toIdx - fromIdx
+    }
+  })
+  const growthList = Object.entries(growthMap)
+    .map(([name, d]) => ({ name, ...d }))
+    .sort((a, b) => b.levels - a.levels)
+  const maxLevels = growthList[0]?.levels || 1
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <p className="text-xs font-medium text-slate-500">멤버 성장 현황</p>
+        <p className="text-[11px] text-slate-400">{growthList.length}명</p>
+      </div>
+      {growthList.length === 0 ? (
+        <p className="text-sm text-slate-400 text-center py-12">기록이 없어요</p>
+      ) : (
+        growthList.map((g, i) => (
+          <div key={g.name} className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 last:border-0">
+            <span className="text-xs text-slate-400 w-5 shrink-0 text-center">{i + 1}</span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {HAS_IMAGE.has(g.start) ? (
+                <Image src={`/promotion/${g.start}.webp`} alt={g.start} width={22} height={22} className="opacity-40" />
+              ) : (
+                <span className="text-[10px] text-slate-300 w-6 text-center">{g.start}</span>
+              )}
+              <span className="text-slate-300 text-xs">→</span>
+              {HAS_IMAGE.has(g.current) ? (
+                <Image src={`/promotion/${g.current}.webp`} alt={g.current} width={26} height={26} />
+              ) : (
+                <span className="text-[10px] text-slate-700 w-6 text-center font-medium">{g.current}</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-semibold text-slate-800">{g.name}</span>
+                <span className="text-xs font-bold text-emerald-600">+{g.levels}단계</span>
+              </div>
+              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full"
+                  style={{ width: `${(g.levels / maxLevels) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
 function WarningTimer({ since }: { since: string }) {
   const DEADLINE = 7 * 24 * 60 * 60 * 1000
   const [remaining, setRemaining] = useState(() => {
@@ -557,48 +619,7 @@ export default function Home() {
                   </>)}
                 </div>
               ) : tab === '성장' ? (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
-                    <p className="text-xs font-medium text-slate-500">승급 변경 이력</p>
-                  </div>
-                  {promotionHistory.length === 0 ? (
-                    <p className="text-sm text-slate-400 text-center py-12">기록이 없어요</p>
-                  ) : (
-                    promotionHistory.map((p) => {
-                      const fromIdx = PROMOTION_ORDER.indexOf(p.현재승급)
-                      const toIdx = PROMOTION_ORDER.indexOf(p.요청승급)
-                      const isUp = toIdx > fromIdx
-                      return (
-                        <div key={p.id} className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 last:border-0">
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {HAS_IMAGE.has(p.현재승급) ? (
-                              <Image src={`/promotion/${p.현재승급}.webp`} alt={p.현재승급} width={22} height={22} className="opacity-50" />
-                            ) : (
-                              <span className="text-[10px] text-slate-300 w-6 text-center">{p.현재승급}</span>
-                            )}
-                            <span className="text-slate-300 text-xs">→</span>
-                            {HAS_IMAGE.has(p.요청승급) ? (
-                              <Image src={`/promotion/${p.요청승급}.webp`} alt={p.요청승급} width={22} height={22} />
-                            ) : (
-                              <span className="text-[10px] text-slate-600 w-6 text-center">{p.요청승급}</span>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm font-semibold text-slate-800">{p.닉네임}</span>
-                            <div className="text-xs text-slate-400 mt-0.5">
-                              {p.현재승급} → <span className={isUp ? 'text-rose-500' : 'text-blue-400'}>{p.요청승급}</span>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="text-base">{isUp ? '⬆️' : '⬇️'}</div>
-                            <div className="text-[11px] text-slate-400">{p.요청일}</div>
-                            {p.상태 === '직접변경' && <div className="text-[10px] text-slate-300">관리자</div>}
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
+                <GrowthTab promotionHistory={promotionHistory} />
               ) : (
               <>
               <p className="text-xs text-slate-400 text-center mb-2">매일 11시, 23시 기준으로 데이터가 수집됩니다!</p>
