@@ -365,18 +365,17 @@ function MemberExpanded({ member, promotionHistory }: { member: Member; promotio
           </div>
           <div className="text-[11px] text-slate-400 mt-0.5">길드 가입 후 승급 횟수</div>
         </div>
-        <div className={`rounded-xl p-3 text-center shadow-sm relative overflow-hidden ${
+        <div className={`rounded-xl p-3 text-center shadow-sm ${
           isOnFire
-            ? 'bg-gradient-to-br from-orange-400 to-red-500 animate-pulse'
+            ? 'bg-white border-2 border-red-400 animate-pulse shadow-red-100 shadow-md'
             : 'bg-white'
         }`}>
-          {isOnFire && <span className="absolute top-1 right-1.5 text-base">🔥</span>}
-          <div className={`text-xl font-bold ${isOnFire ? 'text-white' : 'text-slate-800'}`}>
+          <div className="text-xl font-bold text-slate-800">
             {avgDays !== null
-              ? <>{avgDays}<span className={`text-xs font-normal ml-1 ${isOnFire ? 'text-orange-100' : 'text-slate-400'}`}>일</span></>
+              ? <>{avgDays}<span className="text-xs font-normal text-slate-400 ml-1">일</span></>
               : <span className="text-sm text-slate-400">-</span>}
           </div>
-          <div className={`text-[11px] mt-0.5 ${isOnFire ? 'text-orange-100' : 'text-slate-400'}`}>평균 승급 주기</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">평균 승급 주기</div>
         </div>
       </div>
       {recent.length > 0 ? (
