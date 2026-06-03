@@ -217,9 +217,14 @@ function PromotionRequestModal({ members, onClose }: { members: Member[], onClos
   )
 }
 
-function GrowthTab({ promotionHistory }: { promotionHistory: PromotionHistoryEntry[] }) {
+function GrowthTab({ promotionHistory, members }: { promotionHistory: PromotionHistoryEntry[]; members: Member[] }) {
+  const guildMap: Record<string, string> = {}
+  const currentNames = new Set<string>()
+  members.forEach(m => { if (m.닉네임) { guildMap[m.닉네임] = m.길드; currentNames.add(m.닉네임) } })
+
   const growthMap: Record<string, { start: string; current: string; levels: number }> = {}
   ;[...promotionHistory].reverse().forEach(p => {
+    if (!currentNames.has(p.닉네임)) return
     const fromIdx = PROMOTION_ORDER.indexOf(p.현재승급)
     const toIdx = PROMOTION_ORDER.indexOf(p.요청승급)
     if (toIdx <= fromIdx) return
@@ -230,51 +235,57 @@ function GrowthTab({ promotionHistory }: { promotionHistory: PromotionHistoryEnt
       growthMap[p.닉네임].levels += toIdx - fromIdx
     }
   })
-  const growthList = Object.entries(growthMap)
-    .map(([name, d]) => ({ name, ...d }))
-    .sort((a, b) => b.levels - a.levels)
-  const maxLevels = growthList[0]?.levels || 1
 
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-        <p className="text-xs font-medium text-slate-500">멤버 성장 현황</p>
-        <p className="text-[11px] text-slate-400">{growthList.length}명</p>
-      </div>
-      {growthList.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-12">기록이 없어요</p>
-      ) : (
-        growthList.map((g, i) => (
-          <div key={g.name} className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 last:border-0">
-            <span className="text-xs text-slate-400 w-5 shrink-0 text-center">{i + 1}</span>
-            <div className="flex items-center gap-1.5 shrink-0">
-              {HAS_IMAGE.has(g.start) ? (
-                <Image src={`/promotion/${g.start}.webp`} alt={g.start} width={22} height={22} className="opacity-40" />
-              ) : (
-                <span className="text-[10px] text-slate-300 w-6 text-center">{g.start}</span>
-              )}
-              <span className="text-slate-300 text-xs">→</span>
-              {HAS_IMAGE.has(g.current) ? (
-                <Image src={`/promotion/${g.current}.webp`} alt={g.current} width={26} height={26} />
-              ) : (
-                <span className="text-[10px] text-slate-700 w-6 text-center font-medium">{g.current}</span>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-semibold text-slate-800">{g.name}</span>
-                <span className="text-xs font-bold text-emerald-600">+{g.levels}단계</span>
-              </div>
-              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full"
-                  style={{ width: `${(g.levels / maxLevels) * 100}%` }}
-                />
-              </div>
+  const growthList = Object.entries(growthMap)
+    .map(([name, d]) => ({ name, guild: guildMap[name] || '', ...d }))
+    .sort((a, b) => b.levels - a.levels)
+
+  const luna = growthList.filter(g => g.guild === '루나')
+  const star = growthList.filter(g => g.guild === '별')
+  const maxLevels = Math.max(...growthList.map(g => g.levels), 1)
+
+  const renderBars = (list: typeof growthList, barClass: string) => (
+    <div className="px-4 py-3 space-y-2.5">
+      {list.map((g, i) => (
+        <div key={g.name} className="flex items-center gap-2">
+          <span className="text-[11px] text-slate-400 w-4 shrink-0 text-right">{i + 1}</span>
+          <span className="text-xs font-medium text-slate-700 w-16 shrink-0 truncate">{g.name}</span>
+          <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
+            <div
+              className={`h-full ${barClass} rounded-full flex items-center justify-end pr-2`}
+              style={{ width: `${Math.max((g.levels / maxLevels) * 100, 8)}%` }}
+            >
+              <span className="text-[10px] text-white font-bold">+{g.levels}</span>
             </div>
           </div>
-        ))
-      )}
+          {HAS_IMAGE.has(g.current) && (
+            <Image src={`/promotion/${g.current}.webp`} alt={g.current} width={18} height={18} className="shrink-0" />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-4 py-2.5 bg-purple-50 border-b border-purple-100 flex items-center justify-between">
+          <span className="text-sm font-bold text-purple-600">🌙 루나</span>
+          <span className="text-xs text-purple-400">{luna.length}명</span>
+        </div>
+        {luna.length === 0
+          ? <p className="text-xs text-slate-400 text-center py-6">기록 없음</p>
+          : renderBars(luna, 'bg-gradient-to-r from-purple-500 to-violet-400')}
+      </div>
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-4 py-2.5 bg-yellow-50 border-b border-yellow-100 flex items-center justify-between">
+          <span className="text-sm font-bold text-yellow-600">⭐ 별</span>
+          <span className="text-xs text-yellow-400">{star.length}명</span>
+        </div>
+        {star.length === 0
+          ? <p className="text-xs text-slate-400 text-center py-6">기록 없음</p>
+          : renderBars(star, 'bg-gradient-to-r from-yellow-400 to-amber-400')}
+      </div>
     </div>
   )
 }
@@ -619,7 +630,7 @@ export default function Home() {
                   </>)}
                 </div>
               ) : tab === '성장' ? (
-                <GrowthTab promotionHistory={promotionHistory} />
+                <GrowthTab promotionHistory={promotionHistory} members={members} />
               ) : (
               <>
               <p className="text-xs text-slate-400 text-center mb-2">매일 11시, 23시 기준으로 데이터가 수집됩니다!</p>
