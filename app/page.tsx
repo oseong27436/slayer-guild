@@ -326,6 +326,96 @@ function GrowthTab({ promotionHistory, members }: { promotionHistory: PromotionH
   )
 }
 
+function MemberModal({
+  member,
+  promotionHistory,
+  onClose,
+}: {
+  member: Member
+  promotionHistory: PromotionHistoryEntry[]
+  onClose: () => void
+}) {
+  const myHistory = promotionHistory
+    .filter(p => p.닉네임 === member.닉네임)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+
+  const upHistory = myHistory.filter(p => {
+    const from = PROMOTION_ORDER.indexOf(p.현재승급)
+    const to   = PROMOTION_ORDER.indexOf(p.요청승급)
+    return to > from
+  })
+
+  // 평균 승급 주기 (일)
+  let avgDays: number | null = null
+  if (upHistory.length >= 2) {
+    const intervals: number[] = []
+    for (let i = 1; i < upHistory.length; i++) {
+      const a = new Date(upHistory[i - 1].요청일).getTime()
+      const b = new Date(upHistory[i].요청일).getTime()
+      intervals.push((b - a) / 86400000)
+    }
+    avgDays = Math.round(intervals.reduce((s, v) => s + v, 0) / intervals.length)
+  }
+
+  const recent = [...upHistory].reverse().slice(0, 5)
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 px-0" onClick={onClose}>
+      <div
+        className="bg-white rounded-t-2xl w-full max-w-lg shadow-xl pb-safe overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* 헤더 */}
+        <div className="flex items-center gap-3 px-5 pt-5 pb-4 border-b border-slate-100">
+          {HAS_IMAGE.has(member.승급) && (
+            <Image src={`/promotion/${member.승급}.webp`} alt={member.승급} width={40} height={40} />
+          )}
+          <div>
+            <div className="font-bold text-slate-900 text-base">{member.닉네임}</div>
+            <div className="text-xs text-slate-400">{member.길드} · {member.승급 || '미확인'}</div>
+          </div>
+          <button onClick={onClose} className="ml-auto text-slate-400 text-xl leading-none">×</button>
+        </div>
+
+        {/* 스탯 */}
+        <div className="grid grid-cols-2 gap-3 px-5 py-4">
+          <div className="bg-slate-50 rounded-xl p-3 text-center">
+            <div className="text-2xl font-bold text-slate-800">{upHistory.length}<span className="text-sm font-normal text-slate-400 ml-1">회</span></div>
+            <div className="text-xs text-slate-400 mt-0.5">총 승급 횟수</div>
+          </div>
+          <div className="bg-slate-50 rounded-xl p-3 text-center">
+            <div className="text-2xl font-bold text-slate-800">
+              {avgDays !== null ? <>{avgDays}<span className="text-sm font-normal text-slate-400 ml-1">일</span></> : <span className="text-sm text-slate-400">-</span>}
+            </div>
+            <div className="text-xs text-slate-400 mt-0.5">평균 승급 주기</div>
+          </div>
+        </div>
+
+        {/* 최근 이력 */}
+        {recent.length > 0 && (
+          <div className="px-5 pb-5">
+            <p className="text-xs text-slate-400 mb-2">최근 승급 이력</p>
+            <div className="space-y-1.5">
+              {recent.map(p => (
+                <div key={p.id} className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-400 shrink-0">{p.요청일}</span>
+                  <span className="text-slate-300">·</span>
+                  <span className="text-slate-500 shrink-0">{p.현재승급}</span>
+                  <span className="text-slate-300">→</span>
+                  <span className="font-medium text-slate-800 shrink-0">{p.요청승급}</span>
+                  {HAS_IMAGE.has(p.요청승급) && (
+                    <Image src={`/promotion/${p.요청승급}.webp`} alt={p.요청승급} width={16} height={16} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function WarningTimer({ since }: { since: string }) {
   const DEADLINE = 7 * 24 * 60 * 60 * 1000
   const [remaining, setRemaining] = useState(() => {
@@ -375,6 +465,7 @@ export default function Home() {
   const [loadError, setLoadError] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [heroImage, setHeroImage] = useState<HeroImage>(FALLBACK_IMAGES[0])
   const [heroVisible, setHeroVisible] = useState(true)
 
@@ -700,7 +791,8 @@ export default function Home() {
                 {numbered.map((m, i) => (
                   <div
                     key={i}
-                    className={`flex items-center px-4 py-3.5 border-b border-slate-100 last:border-0 ${
+                    onClick={() => setSelectedMember(m)}
+                    className={`flex items-center px-4 py-3.5 border-b border-slate-100 last:border-0 cursor-pointer active:opacity-70 ${
                       m.promotion_warning_since
                         ? 'bg-red-100/70'
                         : m.길드 === '루나' ? 'bg-purple-50/40' : 'bg-yellow-50/40'
@@ -794,6 +886,9 @@ export default function Home() {
               </div>
               {showRequestModal && (
                 <PromotionRequestModal members={members} onClose={() => setShowRequestModal(false)} />
+              )}
+              {selectedMember && (
+                <MemberModal member={selectedMember} promotionHistory={promotionHistory} onClose={() => setSelectedMember(null)} />
               )}
             </>
           )}
