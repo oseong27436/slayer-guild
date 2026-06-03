@@ -378,7 +378,7 @@ function MemberExpanded({ member, promotionHistory }: { member: Member; promotio
                 <Image src={`/promotion/${p.요청승급}.webp`} alt={p.요청승급} width={14} height={14} />
               )}
               {days !== null && (
-                <span className="text-slate-300 shrink-0">({days}일)</span>
+                <span className="text-slate-500 shrink-0">({days}일)</span>
               )}
             </div>
             )
