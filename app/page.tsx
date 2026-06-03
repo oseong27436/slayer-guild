@@ -339,11 +339,17 @@ function MemberModal({
     .filter(p => p.닉네임 === member.닉네임)
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
 
-  const upHistory = myHistory.filter(p => {
-    const from = PROMOTION_ORDER.indexOf(p.현재승급)
-    const to   = PROMOTION_ORDER.indexOf(p.요청승급)
-    return to > from
-  })
+  const upHistory = myHistory
+    .filter(p => {
+      const from = PROMOTION_ORDER.indexOf(p.현재승급)
+      const to   = PROMOTION_ORDER.indexOf(p.요청승급)
+      return to > from
+    })
+    .filter((p, i, arr) => {
+      if (i === 0) return true
+      const prev = arr[i - 1]
+      return !(p.현재승급 === prev.현재승급 && p.요청승급 === prev.요청승급)
+    })
 
   // 평균 승급 주기 (일)
   let avgDays: number | null = null
