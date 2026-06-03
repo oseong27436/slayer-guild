@@ -363,7 +363,12 @@ function MemberExpanded({ member, promotionHistory }: { member: Member; promotio
       </div>
       {recent.length > 0 ? (
         <div className="space-y-1.5">
-          {recent.map(p => (
+          {recent.map((p, i) => {
+            const prevDate = recent[i + 1]?.요청일
+            const days = prevDate
+              ? Math.round((new Date(p.요청일).getTime() - new Date(prevDate).getTime()) / 86400000)
+              : null
+            return (
             <div key={p.id} className="flex items-center gap-2 text-xs">
               <span className="text-slate-400 shrink-0">{p.요청일.slice(5)}</span>
               <span className="text-slate-400 shrink-0">{p.현재승급}</span>
@@ -372,8 +377,12 @@ function MemberExpanded({ member, promotionHistory }: { member: Member; promotio
               {HAS_IMAGE.has(p.요청승급) && (
                 <Image src={`/promotion/${p.요청승급}.webp`} alt={p.요청승급} width={14} height={14} />
               )}
+              {days !== null && (
+                <span className="text-slate-300 shrink-0">({days}일)</span>
+              )}
             </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <p className="text-xs text-slate-400 text-center py-1">승급 기록 없음</p>
