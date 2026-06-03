@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
@@ -326,98 +326,58 @@ function GrowthTab({ promotionHistory, members }: { promotionHistory: PromotionH
   )
 }
 
-function MemberModal({
-  member,
-  promotionHistory,
-  onClose,
-}: {
-  member: Member
-  promotionHistory: PromotionHistoryEntry[]
-  onClose: () => void
-}) {
-  const myHistory = promotionHistory
+function MemberExpanded({ member, promotionHistory }: { member: Member; promotionHistory: PromotionHistoryEntry[] }) {
+  const upHistory = promotionHistory
     .filter(p => p.닉네임 === member.닉네임)
     .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .filter(p => PROMOTION_ORDER.indexOf(p.요청승급) > PROMOTION_ORDER.indexOf(p.현재승급))
+    .filter((p, i, arr) => i === 0 || !(p.현재승급 === arr[i-1].현재승급 && p.요청승급 === arr[i-1].요청승급))
 
-  const upHistory = myHistory
-    .filter(p => {
-      const from = PROMOTION_ORDER.indexOf(p.현재승급)
-      const to   = PROMOTION_ORDER.indexOf(p.요청승급)
-      return to > from
-    })
-    .filter((p, i, arr) => {
-      if (i === 0) return true
-      const prev = arr[i - 1]
-      return !(p.현재승급 === prev.현재승급 && p.요청승급 === prev.요청승급)
-    })
-
-  // 평균 승급 주기 (일)
   let avgDays: number | null = null
   if (upHistory.length >= 2) {
-    const intervals: number[] = []
-    for (let i = 1; i < upHistory.length; i++) {
-      const a = new Date(upHistory[i - 1].요청일).getTime()
-      const b = new Date(upHistory[i].요청일).getTime()
-      intervals.push((b - a) / 86400000)
-    }
+    const intervals = upHistory.slice(1).map((p, i) =>
+      (new Date(p.요청일).getTime() - new Date(upHistory[i].요청일).getTime()) / 86400000
+    )
     avgDays = Math.round(intervals.reduce((s, v) => s + v, 0) / intervals.length)
   }
 
-  const recent = [...upHistory].reverse().slice(0, 5)
+  const recent = [...upHistory].reverse().slice(0, 4)
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 px-0" onClick={onClose}>
-      <div
-        className="bg-white rounded-t-2xl w-full max-w-lg shadow-xl pb-safe overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* 헤더 */}
-        <div className="flex items-center gap-3 px-5 pt-5 pb-4 border-b border-slate-100">
-          {HAS_IMAGE.has(member.승급) && (
-            <Image src={`/promotion/${member.승급}.webp`} alt={member.승급} width={40} height={40} />
-          )}
-          <div>
-            <div className="font-bold text-slate-900 text-base">{member.닉네임}</div>
-            <div className="text-xs text-slate-400">{member.길드} · {member.승급 || '미확인'}</div>
+    <div className="px-4 py-3 bg-slate-50 border-t border-slate-100">
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+          <div className="text-xl font-bold text-slate-800">
+            {upHistory.length}<span className="text-xs font-normal text-slate-400 ml-1">회</span>
           </div>
-          <button onClick={onClose} className="ml-auto text-slate-400 text-xl leading-none">×</button>
+          <div className="text-[11px] text-slate-400 mt-0.5">총 승급 횟수</div>
         </div>
-
-        {/* 스탯 */}
-        <div className="grid grid-cols-2 gap-3 px-5 py-4">
-          <div className="bg-slate-50 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold text-slate-800">{upHistory.length}<span className="text-sm font-normal text-slate-400 ml-1">회</span></div>
-            <div className="text-xs text-slate-400 mt-0.5">총 승급 횟수</div>
+        <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+          <div className="text-xl font-bold text-slate-800">
+            {avgDays !== null
+              ? <>{avgDays}<span className="text-xs font-normal text-slate-400 ml-1">일</span></>
+              : <span className="text-sm text-slate-400">-</span>}
           </div>
-          <div className="bg-slate-50 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold text-slate-800">
-              {avgDays !== null ? <>{avgDays}<span className="text-sm font-normal text-slate-400 ml-1">일</span></> : <span className="text-sm text-slate-400">-</span>}
-            </div>
-            <div className="text-xs text-slate-400 mt-0.5">평균 승급 주기</div>
-          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">평균 승급 주기</div>
         </div>
-
-        {/* 최근 이력 */}
-        {recent.length > 0 && (
-          <div className="px-5 pb-5">
-            <p className="text-xs text-slate-400 mb-2">최근 승급 이력</p>
-            <div className="space-y-1.5">
-              {recent.map(p => (
-                <div key={p.id} className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-400 shrink-0">{p.요청일}</span>
-                  <span className="text-slate-300">·</span>
-                  <span className="text-slate-500 shrink-0">{p.현재승급}</span>
-                  <span className="text-slate-300">→</span>
-                  <span className="font-medium text-slate-800 shrink-0">{p.요청승급}</span>
-                  {HAS_IMAGE.has(p.요청승급) && (
-                    <Image src={`/promotion/${p.요청승급}.webp`} alt={p.요청승급} width={16} height={16} />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+      {recent.length > 0 ? (
+        <div className="space-y-1.5">
+          {recent.map(p => (
+            <div key={p.id} className="flex items-center gap-2 text-xs">
+              <span className="text-slate-400 shrink-0">{p.요청일.slice(5)}</span>
+              <span className="text-slate-400 shrink-0">{p.현재승급}</span>
+              <span className="text-slate-300">→</span>
+              <span className="font-medium text-slate-700 shrink-0">{p.요청승급}</span>
+              {HAS_IMAGE.has(p.요청승급) && (
+                <Image src={`/promotion/${p.요청승급}.webp`} alt={p.요청승급} width={14} height={14} />
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-slate-400 text-center py-1">승급 기록 없음</p>
+      )}
     </div>
   )
 }
@@ -471,7 +431,7 @@ export default function Home() {
   const [loadError, setLoadError] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null)
+  const [expandedMember, setExpandedMember] = useState<string | null>(null)
   const [heroImage, setHeroImage] = useState<HeroImage>(FALLBACK_IMAGES[0])
   const [heroVisible, setHeroVisible] = useState(true)
 
@@ -795,10 +755,12 @@ export default function Home() {
                   <span className="w-28 text-center shrink-0 leading-tight">용협<br/><span className="text-slate-300 font-normal" style={{fontSize:'10px'}}>전날대비</span></span>
                 </div>
                 {numbered.map((m, i) => (
+                  <Fragment key={i}>
                   <div
-                    key={i}
-                    onClick={() => setSelectedMember(m)}
-                    className={`flex items-center px-4 py-3.5 border-b border-slate-100 last:border-0 cursor-pointer active:opacity-70 ${
+                    onClick={() => setExpandedMember(prev => prev === m.닉네임 ? null : m.닉네임)}
+                    className={`flex items-center px-4 py-3.5 border-b border-slate-100 cursor-pointer active:opacity-70 ${
+                      expandedMember === m.닉네임 ? 'border-b-0' : ''
+                    } ${
                       m.promotion_warning_since
                         ? 'bg-red-100/70'
                         : m.길드 === '루나' ? 'bg-purple-50/40' : 'bg-yellow-50/40'
@@ -847,6 +809,10 @@ export default function Home() {
                       })()}
                     </div>
                   </div>
+                  {expandedMember === m.닉네임 && (
+                    <MemberExpanded member={m} promotionHistory={promotionHistory} />
+                  )}
+                  </Fragment>
                 ))}
               </div>
 
@@ -892,9 +858,6 @@ export default function Home() {
               </div>
               {showRequestModal && (
                 <PromotionRequestModal members={members} onClose={() => setShowRequestModal(false)} />
-              )}
-              {selectedMember && (
-                <MemberModal member={selectedMember} promotionHistory={promotionHistory} onClose={() => setSelectedMember(null)} />
               )}
             </>
           )}
