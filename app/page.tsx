@@ -354,6 +354,8 @@ function MemberExpanded({ member, promotionHistory }: { member: Member; promotio
 
   const recent = [...upHistory].reverse()
 
+  const isOnFire = avgDays !== null && avgDays <= 14
+
   return (
     <div className="px-4 py-3 bg-slate-50 border-t border-slate-100">
       <div className="grid grid-cols-2 gap-2 mb-3">
@@ -361,19 +363,25 @@ function MemberExpanded({ member, promotionHistory }: { member: Member; promotio
           <div className="text-xl font-bold text-slate-800">
             {upHistory.length}<span className="text-xs font-normal text-slate-400 ml-1">회</span>
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">총 승급 횟수</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">길드 가입 후 승급 횟수</div>
         </div>
-        <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-          <div className="text-xl font-bold text-slate-800">
+        <div className={`rounded-xl p-3 text-center shadow-sm relative overflow-hidden ${
+          isOnFire
+            ? 'bg-gradient-to-br from-orange-400 to-red-500 animate-pulse'
+            : 'bg-white'
+        }`}>
+          {isOnFire && <span className="absolute top-1 right-1.5 text-base">🔥</span>}
+          <div className={`text-xl font-bold ${isOnFire ? 'text-white' : 'text-slate-800'}`}>
             {avgDays !== null
-              ? <>{avgDays}<span className="text-xs font-normal text-slate-400 ml-1">일</span></>
+              ? <>{avgDays}<span className={`text-xs font-normal ml-1 ${isOnFire ? 'text-orange-100' : 'text-slate-400'}`}>일</span></>
               : <span className="text-sm text-slate-400">-</span>}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">평균 승급 주기</div>
+          <div className={`text-[11px] mt-0.5 ${isOnFire ? 'text-orange-100' : 'text-slate-400'}`}>평균 승급 주기</div>
         </div>
       </div>
       {recent.length > 0 ? (
         <div className="space-y-1.5">
+          <p className="text-[10px] text-slate-400 mb-1">*정확하지 않을 수 있음!</p>
           {recent.map((p, i) => {
             const prevDate = recent[i + 1]?.요청일
             const days = prevDate
