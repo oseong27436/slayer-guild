@@ -19,6 +19,16 @@ interface HistoryEntry {
   weeks: { date: string; score: number | null; guild: string | null }[]
 }
 
+interface PromotionHistoryEntry {
+  id: string
+  닉네임: string
+  현재승급: string
+  요청승급: string
+  상태: string
+  요청일: string
+  created_at: string
+}
+
 const PROMOTION_ORDER = [
   '스톤', '브론즈', '아이언', '실버', '골드',
   '미스릴', '오리하르콘', '아케이나이트', '아다만타이트',
@@ -248,7 +258,8 @@ const FALLBACK_IMAGES: HeroImage[] = [
 export default function Home() {
   const [members, setMembers] = useState<Member[]>([])
   const [history, setHistory] = useState<HistoryEntry[]>([])
-  const [tab, setTab] = useState<'전체' | '루나' | '별' | '성장'>('전체')
+  const [promotionHistory, setPromotionHistory] = useState<PromotionHistoryEntry[]>([])
+  const [tab, setTab] = useState<'전체' | '성장' | '히스토리'>('전체')
   const [sort, setSort] = useState<'기본' | '용협↓' | '승급↓' | '증감↓'>('기본')
   const [seasonTab, setSeasonTab] = useState<'s3' | 's4'>('s4')
   const [loading, setLoading] = useState(true)
@@ -282,9 +293,11 @@ export default function Home() {
     Promise.all([
       fetch('/api/members', { signal: controller.signal }).then(r => r.json()),
       fetch('/api/history', { signal: controller.signal }).then(r => r.json()),
-    ]).then(([m, h]) => {
+      fetch('/api/promotion-history', { signal: controller.signal }).then(r => r.json()),
+    ]).then(([m, h, ph]) => {
       setMembers(Array.isArray(m) ? m : [])
       setHistory(Array.isArray(h) ? h : [])
+      setPromotionHistory(Array.isArray(ph) ? ph : [])
       setLoading(false)
     }).catch(() => {
       setLoading(false)
@@ -338,7 +351,7 @@ export default function Home() {
     if (diff === null || diff === undefined) return false
     return isFriday ? diff > FRIDAY_THRESHOLD : diff > 0
   }).length
-  const filtered = tab === '전체' ? members : members.filter(m => m.길드 === tab)
+  const filtered = members
   const lunaAvg = getAvgPromotion(luna)
   const starAvg = getAvgPromotion(star)
 
@@ -358,9 +371,8 @@ export default function Home() {
 
   const tabs = [
     { key: '전체' as const, emoji: '⚔️', label: '전체', count: members.length },
-    { key: '루나' as const, emoji: '🌙', label: '루나', count: luna.length },
-    { key: '별' as const, emoji: '⭐', label: '별', count: star.length },
     { key: '성장' as const, emoji: '📈', label: '성장', count: null },
+    { key: '히스토리' as const, emoji: '🕐', label: '히스토리', count: null },
   ]
 
   const SEASON_3_START = '2026-02-23'
@@ -459,9 +471,8 @@ export default function Home() {
                     onClick={() => setTab(t.key)}
                     className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-medium transition-all shadow-sm whitespace-nowrap ${
                       tab === t.key
-                        ? t.key === '루나' ? 'bg-purple-600 text-white'
-                          : t.key === '별' ? 'bg-yellow-500 text-white'
-                          : t.key === '성장' ? 'bg-emerald-600 text-white'
+                        ? t.key === '성장' ? 'bg-emerald-600 text-white'
+                          : t.key === '히스토리' ? 'bg-teal-600 text-white'
                           : 'bg-slate-700 text-white'
                         : 'bg-white/80 backdrop-blur-sm text-slate-600 border border-white/60'
                     }`}
@@ -471,7 +482,7 @@ export default function Home() {
                     {t.count !== null && <span className="opacity-60">({t.count})</span>}
                   </button>
                 ))}
-                {tab !== '성장' && (
+                {tab === '전체' && (
                   <select
                     value={sort}
                     onChange={e => setSort(e.target.value as typeof sort)}
@@ -485,7 +496,7 @@ export default function Home() {
                 )}
               </div>
 
-              {tab === '성장' ? (
+              {tab === '히스토리' ? (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                   {/* 시즌 서브탭 */}
                   <div className="flex gap-2 mb-4">
@@ -498,12 +509,12 @@ export default function Home() {
                         onClick={() => setSeasonTab(s.key)}
                         className={`flex-1 py-2 rounded-xl text-xs font-medium transition flex flex-col items-center gap-0.5 ${
                           seasonTab === s.key
-                            ? 'bg-emerald-600 text-white'
+                            ? 'bg-teal-600 text-white'
                             : 'bg-slate-100 text-slate-500'
                         }`}
                       >
                         <span>{s.label}</span>
-                        <span className={`text-[10px] ${seasonTab === s.key ? 'text-emerald-200' : 'text-slate-400'}`}>{s.sub}</span>
+                        <span className={`text-[10px] ${seasonTab === s.key ? 'text-teal-200' : 'text-slate-400'}`}>{s.sub}</span>
                       </button>
                     ))}
                   </div>
@@ -545,27 +556,64 @@ export default function Home() {
                   })()}
                   </>)}
                 </div>
+              ) : tab === '성장' ? (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                    <p className="text-xs font-medium text-slate-500">승급 변경 이력</p>
+                  </div>
+                  {promotionHistory.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-12">기록이 없어요</p>
+                  ) : (
+                    promotionHistory.map((p) => {
+                      const fromIdx = PROMOTION_ORDER.indexOf(p.현재승급)
+                      const toIdx = PROMOTION_ORDER.indexOf(p.요청승급)
+                      const isUp = toIdx > fromIdx
+                      return (
+                        <div key={p.id} className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 last:border-0">
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {HAS_IMAGE.has(p.현재승급) ? (
+                              <Image src={`/promotion/${p.현재승급}.webp`} alt={p.현재승급} width={22} height={22} className="opacity-50" />
+                            ) : (
+                              <span className="text-[10px] text-slate-300 w-6 text-center">{p.현재승급}</span>
+                            )}
+                            <span className="text-slate-300 text-xs">→</span>
+                            {HAS_IMAGE.has(p.요청승급) ? (
+                              <Image src={`/promotion/${p.요청승급}.webp`} alt={p.요청승급} width={22} height={22} />
+                            ) : (
+                              <span className="text-[10px] text-slate-600 w-6 text-center">{p.요청승급}</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-semibold text-slate-800">{p.닉네임}</span>
+                            <div className="text-xs text-slate-400 mt-0.5">
+                              {p.현재승급} → <span className={isUp ? 'text-rose-500' : 'text-blue-400'}>{p.요청승급}</span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-base">{isUp ? '⬆️' : '⬇️'}</div>
+                            <div className="text-[11px] text-slate-400">{p.요청일}</div>
+                            {p.상태 === '직접변경' && <div className="text-[10px] text-slate-300">관리자</div>}
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
               ) : (
               <>
               <p className="text-xs text-slate-400 text-center mb-2">매일 11시, 23시 기준으로 데이터가 수집됩니다!</p>
 
               {/* 길드 합산 카드 */}
-              {(tab === '전체' || tab === '루나' || tab === '별') && (
-                <div className={`mb-3 ${tab === '전체' ? 'grid grid-cols-2 gap-2' : ''}`}>
-                  {(tab === '전체' || tab === '루나') && (
-                    <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-purple-400">
-                      <div className="text-xs text-purple-400 mb-1 whitespace-nowrap">🌙 루나 · {lunaDone}/{luna.length}명 완료</div>
-                      <div className="text-xl font-bold text-purple-600 tabular-nums">{lunaTotal.toLocaleString()}</div>
-                    </div>
-                  )}
-                  {(tab === '전체' || tab === '별') && (
-                    <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-yellow-400">
-                      <div className="text-xs text-yellow-500 mb-1 whitespace-nowrap">⭐ 별 · {starDone}/{star.length}명 완료</div>
-                      <div className="text-xl font-bold text-yellow-500 tabular-nums">{starTotal.toLocaleString()}</div>
-                    </div>
-                  )}
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-purple-400">
+                  <div className="text-xs text-purple-400 mb-1 whitespace-nowrap">🌙 루나 · {lunaDone}/{luna.length}명 완료</div>
+                  <div className="text-xl font-bold text-purple-600 tabular-nums">{lunaTotal.toLocaleString()}</div>
                 </div>
-              )}
+                <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-yellow-400">
+                  <div className="text-xs text-yellow-500 mb-1 whitespace-nowrap">⭐ 별 · {starDone}/{star.length}명 완료</div>
+                  <div className="text-xl font-bold text-yellow-500 tabular-nums">{starTotal.toLocaleString()}</div>
+                </div>
+              </div>
 
               {/* 멤버 리스트 */}
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
