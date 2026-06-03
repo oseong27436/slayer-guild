@@ -896,11 +896,8 @@ export default function Home() {
                             다음({c.next.next.slice(0, 4)})까지 <span className="font-bold text-slate-700">{c.next.steps}명</span>
                           </div>
                         )}
-                        <div className="flex justify-center gap-3 mt-1">
+                        <div className="mt-1">
                           <span className="text-xs text-slate-500">{c.count}명</span>
-                          {c.interval !== null && (
-                            <span className="text-xs text-slate-400">평균 <span className="font-medium text-slate-600">{c.interval}일</span>/승급</span>
-                          )}
                         </div>
                       </div>
                     ))}
