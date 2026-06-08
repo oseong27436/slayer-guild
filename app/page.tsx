@@ -605,16 +605,21 @@ export default function Home() {
     })
   })
 
-  // 시즌 전체 주 목록 생성 (데이터 없는 주도 0으로 포함)
+  // 시즌 전체 주 목록 생성 (현재 주까지만)
   const allDates = Object.keys(weeklyMap).sort()
   const seasonStart = seasonTab === 's3' ? SEASON_3_START : SEASON_4_START
   const seasonEnd   = seasonTab === 's3' ? SEASON_3_END   : SEASON_4_END
+
+  const todayDate = new Date()
+  const todayDow = todayDate.getDay()
+  todayDate.setDate(todayDate.getDate() - (todayDow === 0 ? 6 : todayDow - 1))
+  const currentMon = todayDate.toISOString().slice(0, 10)
 
   const seasonMondays: string[] = []
   const cursor = new Date(seasonStart)
   const dow = cursor.getDay()
   cursor.setDate(cursor.getDate() - (dow === 0 ? 6 : dow - 1))
-  while (cursor.toISOString().slice(0, 10) <= seasonEnd) {
+  while (cursor.toISOString().slice(0, 10) <= seasonEnd && cursor.toISOString().slice(0, 10) <= currentMon) {
     seasonMondays.push(cursor.toISOString().slice(0, 10))
     cursor.setDate(cursor.getDate() + 7)
   }
