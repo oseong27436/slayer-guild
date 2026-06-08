@@ -624,18 +624,20 @@ export default function Home() {
     cursor.setDate(cursor.getDate() + 7)
   }
 
-  const chartData = seasonMondays.map(mon => {
-    const endOfWeek = new Date(mon)
-    endOfWeek.setDate(endOfWeek.getDate() + 6)
-    const endStr = endOfWeek.toISOString().slice(0, 10)
-    const weekDates = allDates.filter(d => d >= mon && d <= endStr)
-    const best = weekDates[weekDates.length - 1]
-    return {
-      date: endStr.slice(5),
-      루나: best ? (weeklyMap[best]?.루나 ?? 0) : 0,
-      별: best ? (weeklyMap[best]?.별 ?? 0) : 0,
-    }
-  })
+  const chartData = seasonMondays
+    .map(mon => {
+      const endOfWeek = new Date(mon)
+      endOfWeek.setDate(endOfWeek.getDate() + 6)
+      const endStr = endOfWeek.toISOString().slice(0, 10)
+      const weekDates = allDates.filter(d => d >= mon && d <= endStr)
+      const best = weekDates[weekDates.length - 1]
+      if (!best) return null
+      const luna = weeklyMap[best]?.루나 ?? 0
+      const star = weeklyMap[best]?.별 ?? 0
+      if (luna === 0 && star === 0) return null
+      return { date: endStr.slice(5), 루나: luna, 별: star }
+    })
+    .filter((d): d is { date: string; 루나: number; 별: number } => d !== null)
 
   return (
     <div className="bg-slate-100 min-h-screen">
@@ -750,23 +752,23 @@ export default function Home() {
                       <Line type="linear" dataKey="별" stroke="#eab308" strokeWidth={2} dot={{ r: 3, fill: '#eab308' }} activeDot={{ r: 5 }} />
                     </LineChart>
                   </ResponsiveContainer>
-                  {chartData.length > 1 && (() => {
+                  {chartData.length >= 1 && (() => {
                     const last = chartData[chartData.length - 1]
-                    const prev = chartData[chartData.length - 2]
-                    const lunaDiff = last.루나 - prev.루나
-                    const starDiff = last.별 - prev.별
+                    const prev = chartData.length > 1 ? chartData[chartData.length - 2] : null
                     return (
                       <div className="grid grid-cols-2 gap-3 mt-4">
-                        {[
-                          { label: '🌙 루나', total: last.루나, diff: lunaDiff, color: 'text-purple-600' },
-                          { label: '⭐ 별', total: last.별, diff: starDiff, color: 'text-yellow-500' },
-                        ].map(g => (
+                        {([
+                          { label: '🌙 루나', total: last.루나, diff: prev ? last.루나 - prev.루나 : null, color: 'text-purple-600' },
+                          { label: '⭐ 별', total: last.별, diff: prev ? last.별 - prev.별 : null, color: 'text-yellow-500' },
+                        ] as { label: string; total: number; diff: number | null; color: string }[]).map(g => (
                           <div key={g.label} className="bg-slate-50 rounded-xl p-3 text-center">
                             <div className={`text-xs font-medium mb-1 ${g.color}`}>{g.label}</div>
                             <div className="text-lg font-bold text-slate-800">{g.total.toLocaleString()}</div>
-                            <div className={`text-xs mt-0.5 ${g.diff >= 0 ? 'text-rose-500' : 'text-blue-400'}`}>
-                              전주대비 {g.diff >= 0 ? '+' : ''}{g.diff.toLocaleString()}
-                            </div>
+                            {g.diff !== null && (
+                              <div className={`text-xs mt-0.5 ${g.diff >= 0 ? 'text-rose-500' : 'text-blue-400'}`}>
+                                전주대비 {g.diff >= 0 ? '+' : ''}{g.diff.toLocaleString()}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
