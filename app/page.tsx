@@ -407,23 +407,40 @@ export default function Home() {
   const SEASON_4_START = '2026-06-01'
   const SEASON_4_END   = '2026-08-24'
 
-  // 길드 일별 합산 시계열 (기록 당시 길드 기준)
-  const weeklyMap: Record<string, Record<GuildKey, number>> = {}
+  // 길드별 일자별 합산 (기록 당시 길드 기준)
+  const guildDailyMap: Record<GuildKey, Record<string, number>> = Object.fromEntries(
+    GUILDS.map(g => [g.key, {} as Record<string, number>])
+  ) as Record<GuildKey, Record<string, number>>
   history.forEach(entry => {
     entry.weeks.forEach(w => {
       if (w.score === null) return
       const guild = w.guild
       if (!guild || !GUILDS.some(g => g.key === guild)) return
-      if (!weeklyMap[w.date]) weeklyMap[w.date] = Object.fromEntries(GUILDS.map(g => [g.key, 0])) as Record<GuildKey, number>
-      weeklyMap[w.date][guild as GuildKey] += w.score!
+      const map = guildDailyMap[guild as GuildKey]
+      map[w.date] = (map[w.date] ?? 0) + w.score!
     })
   })
 
-  // 시즌 전체 주 목록 생성 (현재 주까지만)
-  const allDates = Object.keys(weeklyMap).sort()
   const seasonStart = seasonTab === 's3' ? SEASON_3_START : SEASON_4_START
   const seasonEnd   = seasonTab === 's3' ? SEASON_3_END   : SEASON_4_END
 
+  // 시즌 기간 내 실제 기록이 있는 날짜 전체 (X축)
+  const allDates = Array.from(new Set(GUILDS.flatMap(g => Object.keys(guildDailyMap[g.key]))))
+    .filter(d => d >= seasonStart && d <= seasonEnd)
+    .sort()
+
+  // 일별 차트 데이터 (기록이 없는 날은 직전 기록값을 유지)
+  const lastValue = Object.fromEntries(GUILDS.map(g => [g.key, 0])) as Record<GuildKey, number>
+  const chartDataFull = allDates.map(d => {
+    GUILDS.forEach(g => {
+      const v = guildDailyMap[g.key][d]
+      if (v !== undefined) lastValue[g.key] = v
+    })
+    return { fullDate: d, date: d.slice(5), ...lastValue }
+  })
+  const chartData = chartDataFull.map(({ fullDate, ...rest }) => rest)
+
+  // 주차별 합산 (요약 카드의 전주대비 계산용, 현재 주까지만)
   const todayDate = new Date()
   const todayDow = todayDate.getDay()
   todayDate.setDate(todayDate.getDate() - (todayDow === 0 ? 6 : todayDow - 1))
@@ -438,19 +455,15 @@ export default function Home() {
     cursor.setDate(cursor.getDate() + 7)
   }
 
-  const chartData = seasonMondays
+  const weeklyTotals = seasonMondays
     .map(mon => {
       const endOfWeek = new Date(mon)
       endOfWeek.setDate(endOfWeek.getDate() + 6)
       const endStr = endOfWeek.toISOString().slice(0, 10)
-      const weekDates = allDates.filter(d => d >= mon && d <= endStr)
-      const best = weekDates[weekDates.length - 1]
-      if (!best) return null
-      const values = Object.fromEntries(GUILDS.map(g => [g.key, weeklyMap[best]?.[g.key] ?? 0])) as Record<GuildKey, number>
-      if (GUILDS.every(g => values[g.key] === 0)) return null
-      return { date: endStr.slice(5), ...values }
+      const upTo = chartDataFull.filter(d => d.fullDate <= endStr)
+      return upTo[upTo.length - 1] ?? null
     })
-    .filter((d): d is { date: string } & Record<GuildKey, number> => d !== null)
+    .filter((d): d is typeof chartDataFull[number] => d !== null)
 
   const guildsWithData = GUILDS.filter(g => chartData.some(d => d[g.key] > 0)).map(g => g.key)
   const effectiveGuilds = selectedGuilds ?? guildsWithData
@@ -582,7 +595,6 @@ export default function Home() {
                     <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                       <YAxis
-                        domain={[(min: number) => Math.floor(min * 0.95), (max: number) => Math.ceil(max * 1.05)]}
                         tick={{ fontSize: 10, fill: '#94a3b8' }}
                         tickLine={false}
                         axisLine={false}
@@ -596,9 +608,9 @@ export default function Home() {
                       ))}
                     </LineChart>
                   </ResponsiveContainer>
-                  {chartData.length >= 1 && (() => {
-                    const last = chartData[chartData.length - 1]
-                    const prev = chartData.length > 1 ? chartData[chartData.length - 2] : null
+                  {weeklyTotals.length >= 1 && (() => {
+                    const last = weeklyTotals[weeklyTotals.length - 1]
+                    const prev = weeklyTotals.length > 1 ? weeklyTotals[weeklyTotals.length - 2] : null
                     return (
                       <div className={`grid ${GRID_COLS[effectiveGuilds.length]} gap-3 mt-4`}>
                         {GUILDS.filter(g => effectiveGuilds.includes(g.key)).map(g => {
