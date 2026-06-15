@@ -424,23 +424,22 @@ export default function Home() {
   const seasonStart = seasonTab === 's3' ? SEASON_3_START : SEASON_4_START
   const seasonEnd   = seasonTab === 's3' ? SEASON_3_END   : SEASON_4_END
 
-  // 시즌 기간 내 실제 기록이 있는 날짜 전체 (X축)
+  // 시즌 기간 내 실제 기록이 있는 날짜 전체
   const allDates = Array.from(new Set(GUILDS.flatMap(g => Object.keys(guildDailyMap[g.key]))))
     .filter(d => d >= seasonStart && d <= seasonEnd)
     .sort()
 
-  // 일별 차트 데이터 (기록이 없는 날은 직전 기록값을 유지)
+  // 일별 누적 스냅샷 (기록이 없는 날은 직전 기록값을 유지) - 주차별 마지막 값 계산용
   const lastValue = Object.fromEntries(GUILDS.map(g => [g.key, 0])) as Record<GuildKey, number>
-  const chartDataFull = allDates.map(d => {
+  const dailySnapshots = allDates.map(d => {
     GUILDS.forEach(g => {
       const v = guildDailyMap[g.key][d]
       if (v !== undefined) lastValue[g.key] = v
     })
-    return { fullDate: d, date: d.slice(5), ...lastValue }
+    return { date: d, ...lastValue }
   })
-  const chartData = chartDataFull.map(({ fullDate, ...rest }) => rest)
 
-  // 주차별 합산 (요약 카드의 전주대비 계산용, 현재 주까지만)
+  // 시즌 주차 목록 (현재 주까지만)
   const todayDate = new Date()
   const todayDow = todayDate.getDay()
   todayDate.setDate(todayDate.getDate() - (todayDow === 0 ? 6 : todayDow - 1))
@@ -455,15 +454,20 @@ export default function Home() {
     cursor.setDate(cursor.getDate() + 7)
   }
 
+  // 주차별 마지막 기록값 (X축: N주차)
   const weeklyTotals = seasonMondays
-    .map(mon => {
+    .map((mon, i) => {
       const endOfWeek = new Date(mon)
       endOfWeek.setDate(endOfWeek.getDate() + 6)
       const endStr = endOfWeek.toISOString().slice(0, 10)
-      const upTo = chartDataFull.filter(d => d.fullDate <= endStr)
-      return upTo[upTo.length - 1] ?? null
+      const upTo = dailySnapshots.filter(d => d.date <= endStr)
+      const snapshot = upTo[upTo.length - 1]
+      if (!snapshot) return null
+      return { ...snapshot, week: i + 1 }
     })
-    .filter((d): d is typeof chartDataFull[number] => d !== null)
+    .filter((d): d is { date: string; week: number } & Record<GuildKey, number> => d !== null)
+
+  const chartData = weeklyTotals.map(({ week, date, ...values }) => ({ date: `${week}주차`, ...values }))
 
   const guildsWithData = GUILDS.filter(g => chartData.some(d => d[g.key] > 0)).map(g => g.key)
   const effectiveGuilds = selectedGuilds ?? guildsWithData
