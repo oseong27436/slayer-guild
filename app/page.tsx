@@ -581,7 +581,14 @@ export default function Home() {
                   <ResponsiveContainer width="100%" height={280}>
                     <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                      <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={v => Number(v).toLocaleString()} width={72} />
+                      <YAxis
+                        domain={[(min: number) => Math.floor(min * 0.95), (max: number) => Math.ceil(max * 1.05)]}
+                        tick={{ fontSize: 10, fill: '#94a3b8' }}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={v => Number(v).toLocaleString()}
+                        width={72}
+                      />
                       <Tooltip formatter={(v) => typeof v === 'number' ? v.toLocaleString() : String(v)} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }} />
                       <Legend wrapperStyle={{ fontSize: 12 }} />
                       {GUILDS.filter(g => effectiveGuilds.includes(g.key)).map(g => (
