@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { GUILDS, type GuildKey } from '../lib/guilds'
 
 interface HeroImage {
   url: string
@@ -40,7 +41,7 @@ const ROLE_LABELS: Record<Role, string> = { '': '없음', '부길드마스터': 
 
 function AddMemberModal({ onClose }: { onClose: () => void }) {
   const [닉네임, set닉네임] = useState('')
-  const [길드, set길드] = useState<'루나' | '별'>('루나')
+  const [길드, set길드] = useState<GuildKey>('루나')
   const [idx, setIdx] = useState(PROMOTION_ORDER.length - 1) // 블리츠골드부터
   const [역할, set역할] = useState<Role>('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
@@ -84,17 +85,15 @@ function AddMemberModal({ onClose }: { onClose: () => void }) {
 
               {/* 길드 선택 */}
               <div className="flex gap-2 mb-4">
-                {(['루나', '별'] as const).map(g => (
+                {GUILDS.map(g => (
                   <button
-                    key={g}
-                    onClick={() => set길드(g)}
+                    key={g.key}
+                    onClick={() => set길드(g.key)}
                     className={`flex-1 py-2 rounded-xl text-sm font-medium transition ${
-                      길드 === g
-                        ? g === '루나' ? 'bg-purple-600 text-white' : 'bg-yellow-500 text-white'
-                        : 'bg-slate-700 text-slate-400'
+                      길드 === g.key ? g.active : 'bg-slate-700 text-slate-400'
                     }`}
                   >
-                    {g === '루나' ? '🌙' : '⭐'} {g}
+                    {g.emoji} {g.key}
                   </button>
                 ))}
               </div>
@@ -167,7 +166,7 @@ function EditMemberModal({ onClose }: { onClose: () => void }) {
   const [members, setMembers] = useState<MemberWithId[]>([])
   const [selected, setSelected] = useState<MemberWithId | null>(null)
   const [닉네임, set닉네임] = useState('')
-  const [길드, set길드] = useState<'루나' | '별'>('루나')
+  const [길드, set길드] = useState<GuildKey>('루나')
   const [idx, setIdx] = useState(0)
   const [역할, set역할] = useState<Role>('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
@@ -180,7 +179,7 @@ function EditMemberModal({ onClose }: { onClose: () => void }) {
   const select = (m: MemberWithId) => {
     setSelected(m)
     set닉네임(m.닉네임)
-    set길드(m.길드 as '루나' | '별')
+    set길드(m.길드 as GuildKey)
     setIdx(Math.max(0, PROMOTION_ORDER.indexOf(m.승급)))
     set역할((m.역할 as Role) || '')
     setStatus('idle')
@@ -257,17 +256,15 @@ function EditMemberModal({ onClose }: { onClose: () => void }) {
 
                   {/* 길드 */}
                   <div className="flex gap-2 mb-4">
-                    {(['루나', '별'] as const).map(g => (
+                    {GUILDS.map(g => (
                       <button
-                        key={g}
-                        onClick={() => set길드(g)}
+                        key={g.key}
+                        onClick={() => set길드(g.key)}
                         className={`flex-1 py-2 rounded-xl text-sm font-medium transition ${
-                          길드 === g
-                            ? g === '루나' ? 'bg-purple-600 text-white' : 'bg-yellow-500 text-white'
-                            : 'bg-slate-700 text-slate-400'
+                          길드 === g.key ? g.active : 'bg-slate-700 text-slate-400'
                         }`}
                       >
-                        {g === '루나' ? '🌙' : '⭐'} {g}
+                        {g.emoji} {g.key}
                       </button>
                     ))}
                   </div>
@@ -599,7 +596,7 @@ function ReorderModal({ onClose }: { onClose: () => void }) {
                   <div key={m.id} className="flex items-center gap-2 py-2">
                     <span className="text-xs text-slate-500 w-5 text-right shrink-0">{i + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <span className={`text-xs font-bold mr-1.5 ${m.길드 === '루나' ? 'text-purple-400' : 'text-yellow-400'}`}>{m.길드}</span>
+                      <span className={`text-xs font-bold mr-1.5 ${GUILDS.find(g => g.key === m.길드)?.accent ?? 'text-slate-400'}`}>{m.길드}</span>
                       <span className="text-sm text-white">
                         {m.역할 === '길드마스터' ? '👑 ' : m.역할 === '부길드마스터' ? <span style={{filter:'grayscale(1) brightness(1.8)'}}>👑 </span> : ''}
                         {m.닉네임}
@@ -776,18 +773,18 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* 점수 입력 — 루나 / 별 */}
+        {/* 점수 입력 — 길드별 */}
         {loadingScores ? (
           <div className="text-slate-500 text-sm text-center py-8">불러오는 중...</div>
         ) : (
           <>
-            {(['루나', '별'] as const).map(guild => {
-              const guildMembers = members.filter(m => m.길드 === guild)
+            {GUILDS.map(g => {
+              const guildMembers = members.filter(m => m.길드 === g.key)
               return (
-                <div key={guild} className="mb-6 bg-slate-800 rounded-xl overflow-hidden">
+                <div key={g.key} className="mb-6 bg-slate-800 rounded-xl overflow-hidden">
                   <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
                     <span className="text-sm font-bold text-slate-300">
-                      {guild === '루나' ? '🌙' : '⭐'} {guild}
+                      {g.emoji} {g.key}
                     </span>
                     <span className="text-xs text-slate-500">({guildMembers.length}명)</span>
                   </div>

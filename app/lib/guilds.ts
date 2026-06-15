@@ -1,0 +1,43 @@
+export const GUILDS = [
+  {
+    key: '루나',
+    emoji: '🌙',
+    active: 'bg-purple-600 text-white',
+    gradient: 'bg-gradient-to-r from-purple-500 to-violet-400',
+    line: '#9333ea',
+    accent: 'text-purple-500',
+    accentStrong: 'text-purple-600',
+    rowBg: 'bg-purple-50/40',
+    cardBorder: 'border-purple-400',
+    statBg: 'bg-purple-50',
+    statBorder: 'border-purple-200',
+  },
+  {
+    key: '별',
+    emoji: '⭐',
+    active: 'bg-yellow-500 text-white',
+    gradient: 'bg-gradient-to-r from-yellow-400 to-amber-400',
+    line: '#eab308',
+    accent: 'text-yellow-500',
+    accentStrong: 'text-yellow-600',
+    rowBg: 'bg-yellow-50/40',
+    cardBorder: 'border-yellow-400',
+    statBg: 'bg-yellow-50',
+    statBorder: 'border-yellow-200',
+  },
+  {
+    key: '여명',
+    emoji: '🌌',
+    active: 'bg-sky-500 text-white',
+    gradient: 'bg-gradient-to-r from-sky-500 to-cyan-400',
+    line: '#0ea5e9',
+    accent: 'text-sky-500',
+    accentStrong: 'text-sky-600',
+    rowBg: 'bg-sky-50/40',
+    cardBorder: 'border-sky-400',
+    statBg: 'bg-sky-50',
+    statBorder: 'border-sky-200',
+  },
+] as const
+
+export type GuildKey = typeof GUILDS[number]['key']

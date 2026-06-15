@@ -1,8 +1,9 @@
 'use client'
 
-import { Fragment, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { GUILDS, type GuildKey } from './lib/guilds'
 
 interface Member {
   번호: string
@@ -64,57 +65,57 @@ function getNextSteps(members: Member[]) {
   return { next: PROMOTION_ORDER[nextIdx], steps: Math.max(1, needed) }
 }
 
-function DistributionChart({ members, tab }: { members: Member[]; tab: string }) {
-  const dist: Record<string, { total: number; luna: number; star: number }> = {}
+function getUpHistory(nickname: string, promotionHistory: PromotionHistoryEntry[]) {
+  return promotionHistory
+    .filter(p => p.닉네임 === nickname)
+    .filter(p => PROMOTION_ORDER.indexOf(p.요청승급) > PROMOTION_ORDER.indexOf(p.현재승급))
+    .sort((a, b) => a.요청일.localeCompare(b.요청일))
+    .filter((p, i, arr) => i === 0 || !(p.현재승급 === arr[i-1].현재승급 && p.요청승급 === arr[i-1].요청승급))
+}
+
+function getAvgDays(upHistory: PromotionHistoryEntry[]) {
+  if (upHistory.length < 2) return null
+  const intervals = upHistory.slice(1).map((p, i) =>
+    (new Date(p.요청일).getTime() - new Date(upHistory[i].요청일).getTime()) / 86400000
+  )
+  return Math.round(intervals.reduce((s, v) => s + v, 0) / intervals.length)
+}
+
+function DistributionChart({ members }: { members: Member[] }) {
+  const dist: Record<string, { total: number } & Record<GuildKey, number>> = {}
   members.forEach(m => {
     if (!m.승급) return
-    if (!dist[m.승급]) dist[m.승급] = { total: 0, luna: 0, star: 0 }
+    if (!dist[m.승급]) {
+      dist[m.승급] = { total: 0, ...Object.fromEntries(GUILDS.map(g => [g.key, 0])) } as { total: number } & Record<GuildKey, number>
+    }
     dist[m.승급].total++
-    if (m.길드 === '루나') dist[m.승급].luna++
-    else if (m.길드 === '별') dist[m.승급].star++
+    if (GUILDS.some(g => g.key === m.길드)) dist[m.승급][m.길드 as GuildKey]++
   })
   const sorted = PROMOTION_ORDER.filter(p => dist[p]).map(p => ({ name: p, ...dist[p] })).reverse()
   const max = Math.max(...sorted.map(s => s.total), 1)
 
-  const barColor = tab === '루나'
-    ? 'bg-gradient-to-r from-purple-500 to-violet-400'
-    : tab === '별'
-    ? 'bg-gradient-to-r from-yellow-400 to-amber-400'
-    : null
-
   return (
     <div className="space-y-2">
-      {sorted.map(({ name, total, luna, star }) => (
-        <div key={name} className="flex items-center gap-2">
+      {sorted.map((row) => {
+        const lastNonZero = GUILDS.reduce((acc, g, i) => row[g.key] > 0 ? i : acc, -1)
+        return (
+        <div key={row.name} className="flex items-center gap-2">
           <div className="w-32 flex items-center justify-end gap-1.5 shrink-0">
-            {HAS_IMAGE.has(name) && <Image src={`/promotion/${name}.webp`} alt={name} width={20} height={20} />}
-            <span className="text-xs text-slate-500 truncate">{name}</span>
+            {HAS_IMAGE.has(row.name) && <Image src={`/promotion/${row.name}.webp`} alt={row.name} width={20} height={20} />}
+            <span className="text-xs text-slate-500 truncate">{row.name}</span>
           </div>
           <div className="flex-1 bg-slate-100 rounded-full h-6 overflow-hidden">
-            {barColor ? (
-              <div
-                className={`h-full ${barColor} rounded-full flex items-center justify-end pr-2`}
-                style={{ width: `${(total / max) * 100}%` }}
-              >
-                <span className="text-xs text-white font-bold">{total}</span>
-              </div>
-            ) : (
-              <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${(total / max) * 100}%` }}>
-                {luna > 0 && (
-                  <div className="h-full bg-gradient-to-r from-purple-500 to-violet-400 flex items-center justify-end" style={{ flex: luna }}>
-                    {star === 0 && <span className="text-xs text-white font-bold pr-2">{total}</span>}
-                  </div>
-                )}
-                {star > 0 && (
-                  <div className="h-full bg-gradient-to-r from-yellow-400 to-amber-400 flex items-center justify-end" style={{ flex: star }}>
-                    <span className="text-xs text-white font-bold pr-2">{total}</span>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${(row.total / max) * 100}%` }}>
+              {GUILDS.map((g, i) => row[g.key] > 0 && (
+                <div key={g.key} className={`h-full ${g.gradient} flex items-center justify-end`} style={{ flex: row[g.key] }}>
+                  {i === lastNonZero && <span className="text-xs text-white font-bold pr-2">{row.total}</span>}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -228,136 +229,27 @@ function PromotionRequestModal({ members, onClose }: { members: Member[], onClos
   )
 }
 
-const LUNA_COLORS = ['#7c3aed','#9333ea','#a855f7','#6d28d9','#c084fc','#8b5cf6','#ddd6fe','#4c1d95','#b197fc','#e879f9']
-const STAR_COLORS  = ['#d97706','#f59e0b','#b45309','#fbbf24','#92400e','#f59e2a','#fde68a','#78350f','#fcd34d','#fb923c']
-
-function GrowthTab({ promotionHistory, members }: { promotionHistory: PromotionHistoryEntry[]; members: Member[] }) {
-  const guildMap: Record<string, string> = {}
-  const currentNames = new Set<string>()
-  members.forEach(m => { if (m.닉네임) { guildMap[m.닉네임] = m.길드; currentNames.add(m.닉네임) } })
-
-  // 멤버별 날짜-승급 포인트 시리즈 구성
-  const memberMap: Record<string, { guild: string; points: { date: string; rank: number }[] }> = {}
-
-  const sorted = [...promotionHistory]
-    .filter(p => currentNames.has(p.닉네임))
-    .sort((a, b) => a.created_at.localeCompare(b.created_at))
-
-  sorted.forEach(p => {
-    const fromIdx = PROMOTION_ORDER.indexOf(p.현재승급)
-    const toIdx   = PROMOTION_ORDER.indexOf(p.요청승급)
-    if (fromIdx < 0 || toIdx < 0) return
-
-    if (!memberMap[p.닉네임]) {
-      memberMap[p.닉네임] = {
-        guild: guildMap[p.닉네임] || '',
-        points: [{ date: p.요청일, rank: fromIdx }],
-      }
-    }
-    const pts  = memberMap[p.닉네임].points
-    const last = pts[pts.length - 1]
-    if (last.date === p.요청일) {
-      last.rank = toIdx
-    } else {
-      pts.push({ date: p.요청일, rank: toIdx })
-    }
-  })
-
-  const lunaMembers = Object.entries(memberMap).filter(([, v]) => v.guild === '루나')
-  const starMembers  = Object.entries(memberMap).filter(([, v]) => v.guild === '별')
-
-  // y축 범위: 전체 데이터 기준
-  const allRanks = Object.values(memberMap).flatMap(v => v.points.map(p => p.rank))
-  const yMin = allRanks.length ? Math.max(0, Math.min(...allRanks) - 1) : 0
-  const yMax = allRanks.length ? Math.min(25, Math.max(...allRanks) + 1) : 25
-
-  const renderChart = (list: typeof lunaMembers, colors: string[]) => {
-    if (list.length === 0) return <p className="text-xs text-slate-400 text-center py-8">기록 없음</p>
-    return (
-      <ResponsiveContainer width="100%" height={240}>
-        <LineChart margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-          <XAxis
-            dataKey="date"
-            type="category"
-            allowDuplicatedCategory={false}
-            tick={{ fontSize: 9, fill: '#94a3b8' }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(v: string) => v.slice(5)}
-          />
-          <YAxis
-            domain={[yMin, yMax]}
-            tick={{ fontSize: 9, fill: '#94a3b8' }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(v: number) => PROMOTION_ORDER[v]?.slice(0, 4) ?? ''}
-            width={36}
-          />
-          <Tooltip
-            formatter={(value: unknown, name: unknown) => [PROMOTION_ORDER[value as number] ?? String(value), String(name)]}
-            contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
-            labelStyle={{ fontSize: 10, color: '#94a3b8' }}
-          />
-          {list.map(([name, { points }], i) => (
-            <Line
-              key={name}
-              data={points}
-              type="stepAfter"
-              dataKey="rank"
-              name={name}
-              stroke={colors[i % colors.length]}
-              strokeWidth={2}
-              dot={{ r: 3, fill: colors[i % colors.length] }}
-              activeDot={{ r: 5 }}
-              connectNulls
-            />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-4 py-2.5 bg-purple-50 border-b border-purple-100 flex items-center justify-between">
-          <span className="text-sm font-bold text-purple-600">🌙 루나</span>
-          <span className="text-xs text-purple-400">{lunaMembers.length}명</span>
-        </div>
-        <div className="px-2 pt-3 pb-2">{renderChart(lunaMembers, LUNA_COLORS)}</div>
-      </div>
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-4 py-2.5 bg-yellow-50 border-b border-yellow-100 flex items-center justify-between">
-          <span className="text-sm font-bold text-yellow-600">⭐ 별</span>
-          <span className="text-xs text-yellow-400">{starMembers.length}명</span>
-        </div>
-        <div className="px-2 pt-3 pb-2">{renderChart(starMembers, STAR_COLORS)}</div>
-      </div>
-    </div>
-  )
-}
-
-function MemberExpanded({ member, promotionHistory }: { member: Member; promotionHistory: PromotionHistoryEntry[] }) {
-  const upHistory = promotionHistory
-    .filter(p => p.닉네임 === member.닉네임)
-    .filter(p => PROMOTION_ORDER.indexOf(p.요청승급) > PROMOTION_ORDER.indexOf(p.현재승급))
-    .sort((a, b) => a.요청일.localeCompare(b.요청일))
-    .filter((p, i, arr) => i === 0 || !(p.현재승급 === arr[i-1].현재승급 && p.요청승급 === arr[i-1].요청승급))
-
-  let avgDays: number | null = null
-  if (upHistory.length >= 2) {
-    const intervals = upHistory.slice(1).map((p, i) =>
-      (new Date(p.요청일).getTime() - new Date(upHistory[i].요청일).getTime()) / 86400000
-    )
-    avgDays = Math.round(intervals.reduce((s, v) => s + v, 0) / intervals.length)
-  }
-
+function MemberExpanded({ member, promotionHistory, onClose }: { member: Member; promotionHistory: PromotionHistoryEntry[]; onClose: () => void }) {
+  const upHistory = getUpHistory(member.닉네임, promotionHistory)
+  const avgDays = getAvgDays(upHistory)
   const recent = [...upHistory].reverse()
 
   const isOnFire = avgDays !== null && avgDays <= 14
 
+  const guild = GUILDS.find(g => g.key === member.길드)
+
   return (
-    <div className="px-4 py-3 bg-slate-50 border-t border-slate-100">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-slate-100">
+        {HAS_IMAGE.has(member.승급) && (
+          <Image src={`/promotion/${member.승급}.webp`} alt={member.승급} width={24} height={24} />
+        )}
+        <span className="text-sm font-bold text-slate-800">{member.닉네임}</span>
+        {guild && <span className="text-xs text-slate-400">{guild.emoji} {guild.key}</span>}
+        <button onClick={onClose} className="ml-auto -m-2 p-2 text-slate-400 text-2xl leading-none">&times;</button>
+      </div>
+      <div className="p-4 overflow-y-auto overscroll-contain">
       <div className="grid grid-cols-2 gap-2 mb-3">
         <div className="bg-white rounded-xl p-3 text-center shadow-sm">
           <div className="text-xl font-bold text-slate-800">
@@ -405,39 +297,9 @@ function MemberExpanded({ member, promotionHistory }: { member: Member; promotio
       ) : (
         <p className="text-xs text-slate-400 text-center py-1">승급 기록 없음</p>
       )}
+      </div>
+      </div>
     </div>
-  )
-}
-
-function WarningTimer({ since }: { since: string }) {
-  const DEADLINE = 7 * 24 * 60 * 60 * 1000
-  const [remaining, setRemaining] = useState(() => {
-    const elapsed = Date.now() - new Date(since).getTime()
-    return Math.max(0, DEADLINE - elapsed)
-  })
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const elapsed = Date.now() - new Date(since).getTime()
-      setRemaining(Math.max(0, DEADLINE - elapsed))
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [since])
-
-  const totalSec = Math.floor(remaining / 1000)
-  const days = Math.floor(totalSec / 86400)
-  const hours = Math.floor((totalSec % 86400) / 3600)
-  const mins = Math.floor((totalSec % 3600) / 60)
-  const secs = totalSec % 60
-
-  const pad = (n: number) => n.toString().padStart(2, '0')
-
-  if (remaining <= 0) return <span className="text-xs font-bold text-red-500">방출 대상</span>
-
-  return (
-    <span className="text-xs font-mono text-red-500 tabular-nums">
-      {days > 0 ? `${days}일 ` : ''}{pad(hours)}:{pad(mins)}:{pad(secs)}
-    </span>
   )
 }
 
@@ -451,8 +313,8 @@ export default function Home() {
   const [members, setMembers] = useState<Member[]>([])
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [promotionHistory, setPromotionHistory] = useState<PromotionHistoryEntry[]>([])
-  const [tab, setTab] = useState<'전체' | '루나' | '별' | '히스토리'>('전체')
-  const [sort, setSort] = useState<'기본' | '용협↓' | '승급↓' | '증감↓'>('기본')
+  const [tab, setTab] = useState<'전체' | '히스토리' | '성장곡선'>('전체')
+  const [sort, setSort] = useState<'기본' | '승급↓'>('기본')
   const [seasonTab, setSeasonTab] = useState<'s3' | 's4'>('s4')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -461,6 +323,8 @@ export default function Home() {
   const [expandedMember, setExpandedMember] = useState<string | null>(null)
   const [heroImage, setHeroImage] = useState<HeroImage>(FALLBACK_IMAGES[0])
   const [heroVisible, setHeroVisible] = useState(true)
+  const [heroAspect, setHeroAspect] = useState<number | null>(null)
+  const [selectedGuilds, setSelectedGuilds] = useState<GuildKey[] | null>(null)
 
   useEffect(() => {
     fetch('/api/hero-images')
@@ -477,6 +341,12 @@ export default function Home() {
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    const open = showRequestModal || expandedMember !== null
+    document.body.style.overflow = open ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [showRequestModal, expandedMember])
 
   const loadData = () => {
     setLoading(true)
@@ -500,76 +370,12 @@ export default function Home() {
 
   useEffect(() => { loadData() }, [])
 
-
-  // 닉네임 → 증감 맵 (오늘 기록이 있을 때만, 같은 주 내 전날 대비)
-  const getMonWeek = (dateStr: string) => {
-    const d = new Date(dateStr)
-    const day = d.getDay()
-    const mon = new Date(d)
-    mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
-    return mon.toISOString().slice(0, 10)
-  }
-
-  const today = new Date().toLocaleDateString('sv-SE')  // YYYY-MM-DD (로컬 날짜)
-  const isFriday = new Date().getDay() === 5
-  const FRIDAY_THRESHOLD = 21000
-
-  const diffMap: Record<string, number | null> = {}
-  history.forEach(entry => {
-    const valid = entry.weeks.filter((w): w is { date: string; score: number; guild: string | null } => w.score !== null)
-    if (valid.length >= 2) {
-      const last = valid[valid.length - 1]
-      const prev = valid[valid.length - 2]
-      if (last.date === today && getMonWeek(last.date) === getMonWeek(prev.date)) {
-        diffMap[entry.닉네임] = last.score - prev.score
-      } else {
-        diffMap[entry.닉네임] = null
-      }
-    } else {
-      diffMap[entry.닉네임] = null
-    }
+  const guildStats = GUILDS.map(g => {
+    const list = members.filter(m => m.길드 === g.key)
+    return { ...g, members: list, avg: getAvgPromotion(list), next: getNextSteps(list) }
   })
-
-  const luna = members.filter(m => m.길드 === '루나')
-  const star = members.filter(m => m.길드 === '별')
-  const lunaTotal = luna.reduce((s, m) => s + (Number(m.용협) || 0), 0)
-  const starTotal = star.reduce((s, m) => s + (Number(m.용협) || 0), 0)
-  const lunaDone = luna.filter(m => {
-    const diff = diffMap[m.닉네임]
-    if (diff === null || diff === undefined) return false
-    return isFriday ? diff > FRIDAY_THRESHOLD : diff > 0
-  }).length
-  const starDone = star.filter(m => {
-    const diff = diffMap[m.닉네임]
-    if (diff === null || diff === undefined) return false
-    return isFriday ? diff > FRIDAY_THRESHOLD : diff > 0
-  }).length
-  const filtered = tab === '전체' ? members : tab === '루나' || tab === '별' ? members.filter(m => m.길드 === tab) : members
-  const lunaAvg = getAvgPromotion(luna)
-  const starAvg = getAvgPromotion(star)
-  const lunaNext = getNextSteps(luna)
-  const starNext = getNextSteps(star)
-
-  const calcGuildInterval = (guildMembers: Member[]) => {
-    const intervals: number[] = []
-    guildMembers.forEach(m => {
-      const ups = promotionHistory
-        .filter(p => p.닉네임 === m.닉네임)
-        .filter(p => PROMOTION_ORDER.indexOf(p.요청승급) > PROMOTION_ORDER.indexOf(p.현재승급))
-        .sort((a, b) => a.요청일.localeCompare(b.요청일))
-        .filter((p, i, arr) => i === 0 || !(p.현재승급 === arr[i-1].현재승급 && p.요청승급 === arr[i-1].요청승급))
-      for (let i = 1; i < ups.length; i++)
-        intervals.push((new Date(ups[i].요청일).getTime() - new Date(ups[i-1].요청일).getTime()) / 86400000)
-    })
-    return intervals.length ? Math.round(intervals.reduce((s, v) => s + v, 0) / intervals.length) : null
-  }
-  const lunaInterval = calcGuildInterval(luna)
-  const starInterval = calcGuildInterval(star)
-
-  const sorted = [...filtered].sort((a, b) => {
-    if (sort === '용협↓') return (Number(b.용협) || 0) - (Number(a.용협) || 0)
+  const sorted = [...members].sort((a, b) => {
     if (sort === '승급↓') return PROMOTION_ORDER.indexOf(b.승급) - PROMOTION_ORDER.indexOf(a.승급)
-    if (sort === '증감↓') return (diffMap[b.닉네임] ?? 0) - (diffMap[a.닉네임] ?? 0)
     // 기본: 번호 오름차순 (길마는 번호로 이미 각 길드 최상단)
     return Number(a.번호) - Number(b.번호)
   })
@@ -580,11 +386,20 @@ export default function Home() {
     return { ...m, idx: guildCount[m.길드] }
   })
 
+  const growthAll = sorted.map(m => {
+    const upHistory = getUpHistory(m.닉네임, promotionHistory)
+    return { member: m, avgDays: getAvgDays(upHistory) }
+  })
+  const growthData = growthAll
+    .filter((d): d is { member: Member; avgDays: number } => d.avgDays !== null)
+    .map(d => ({ ...d, speed: 14 / d.avgDays }))
+    .sort((a, b) => b.speed - a.speed)
+  const noGrowthData = growthAll.filter(d => d.avgDays === null).map(d => d.member)
+
   const tabs = [
     { key: '전체' as const, emoji: '⚔️', label: '전체', count: members.length },
-    { key: '루나' as const, emoji: '🌙', label: '루나', count: luna.length },
-    { key: '별' as const, emoji: '⭐', label: '별', count: star.length },
     { key: '히스토리' as const, emoji: '🕐', label: '히스토리', count: null },
+    { key: '성장곡선' as const, emoji: '📈', label: '성장곡선', count: null },
   ]
 
   const SEASON_3_START = '2026-02-23'
@@ -593,15 +408,14 @@ export default function Home() {
   const SEASON_4_END   = '2026-08-24'
 
   // 길드 일별 합산 시계열 (기록 당시 길드 기준)
-  const weeklyMap: Record<string, { 루나: number; 별: number }> = {}
+  const weeklyMap: Record<string, Record<GuildKey, number>> = {}
   history.forEach(entry => {
     entry.weeks.forEach(w => {
       if (w.score === null) return
       const guild = w.guild
-      if (!guild) return
-      if (!weeklyMap[w.date]) weeklyMap[w.date] = { 루나: 0, 별: 0 }
-      if (guild === '루나') weeklyMap[w.date].루나 += w.score!
-      if (guild === '별') weeklyMap[w.date].별 += w.score!
+      if (!guild || !GUILDS.some(g => g.key === guild)) return
+      if (!weeklyMap[w.date]) weeklyMap[w.date] = Object.fromEntries(GUILDS.map(g => [g.key, 0])) as Record<GuildKey, number>
+      weeklyMap[w.date][guild as GuildKey] += w.score!
     })
   })
 
@@ -632,25 +446,33 @@ export default function Home() {
       const weekDates = allDates.filter(d => d >= mon && d <= endStr)
       const best = weekDates[weekDates.length - 1]
       if (!best) return null
-      const luna = weeklyMap[best]?.루나 ?? 0
-      const star = weeklyMap[best]?.별 ?? 0
-      if (luna === 0 && star === 0) return null
-      return { date: endStr.slice(5), 루나: luna, 별: star }
+      const values = Object.fromEntries(GUILDS.map(g => [g.key, weeklyMap[best]?.[g.key] ?? 0])) as Record<GuildKey, number>
+      if (GUILDS.every(g => values[g.key] === 0)) return null
+      return { date: endStr.slice(5), ...values }
     })
-    .filter((d): d is { date: string; 루나: number; 별: number } => d !== null)
+    .filter((d): d is { date: string } & Record<GuildKey, number> => d !== null)
+
+  const guildsWithData = GUILDS.filter(g => chartData.some(d => d[g.key] > 0)).map(g => g.key)
+  const effectiveGuilds = selectedGuilds ?? guildsWithData
+  const toggleGuild = (key: GuildKey) => {
+    const base = selectedGuilds ?? guildsWithData
+    setSelectedGuilds(base.includes(key) ? base.filter(k => k !== key) : [...base, key])
+  }
+  const GRID_COLS: Record<number, string> = { 0: 'grid-cols-1', 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' }
 
   return (
     <div className="bg-slate-100 min-h-screen">
       {/* 히어로 + 콘텐츠가 하나의 흐름 */}
       <div className="relative">
         {/* 히어로 이미지 */}
-        <div className="relative w-full h-[45svh] md:h-[100svh]">
+        <div className={`relative w-full h-[45svh] md:h-[100svh] ${heroAspect !== null && heroAspect > 2 ? 'bg-slate-950' : ''}`}>
           <Image
             src={heroImage.url}
             alt="hero"
             fill
-            className="object-cover transition-opacity duration-300"
+            className={`transition-opacity duration-300 ${heroAspect !== null && heroAspect > 2 ? 'object-contain' : 'object-cover'}`}
             style={{ opacity: heroVisible ? 1 : 0, objectPosition: `${heroImage.focalX}% ${heroImage.focalY}%` }}
+            onLoad={e => setHeroAspect(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
             priority
             unoptimized
           />
@@ -690,10 +512,9 @@ export default function Home() {
                     onClick={() => setTab(t.key)}
                     className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-medium transition-all shadow-sm whitespace-nowrap ${
                       tab === t.key
-                        ? t.key === '루나' ? 'bg-purple-600 text-white'
-                          : t.key === '별' ? 'bg-yellow-500 text-white'
-                          : t.key === '히스토리' ? 'bg-teal-600 text-white'
-                          : 'bg-slate-700 text-white'
+                        ? t.key === '히스토리' ? 'bg-teal-600 text-white'
+                        : t.key === '성장곡선' ? 'bg-orange-500 text-white'
+                        : 'bg-slate-700 text-white'
                         : 'bg-white/80 backdrop-blur-sm text-slate-600 border border-white/60'
                     }`}
                   >
@@ -702,16 +523,14 @@ export default function Home() {
                     {t.count !== null && <span className="opacity-60">({t.count})</span>}
                   </button>
                 ))}
-                {tab !== '히스토리' && (
+                {tab === '전체' && (
                   <select
                     value={sort}
                     onChange={e => setSort(e.target.value as typeof sort)}
                     className="bg-white/80 backdrop-blur-sm border border-white/60 text-slate-600 text-xs rounded-xl px-2 py-2 shadow-sm"
                   >
                     <option>기본</option>
-                    <option>용협↓</option>
                     <option>승급↓</option>
-                    <option>증감↓</option>
                   </select>
                 )}
               </div>
@@ -738,6 +557,23 @@ export default function Home() {
                       </button>
                     ))}
                   </div>
+                  {/* 길드 선택 토글 */}
+                  <div className="flex gap-2 mb-4">
+                    {GUILDS.map(g => {
+                      const selected = effectiveGuilds.includes(g.key)
+                      return (
+                        <button
+                          key={g.key}
+                          onClick={() => toggleGuild(g.key)}
+                          className={`flex-1 py-1.5 rounded-xl text-xs font-medium transition ${
+                            selected ? g.active : 'bg-slate-100 text-slate-400'
+                          }`}
+                        >
+                          {g.emoji} {g.key}
+                        </button>
+                      )
+                    })}
+                  </div>
                   {chartData.length === 0 ? (
                     <p className="text-sm text-slate-400 text-center py-16">아직 기록이 없어요</p>
                   ) : (<>
@@ -748,125 +584,121 @@ export default function Home() {
                       <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={v => Number(v).toLocaleString()} width={72} />
                       <Tooltip formatter={(v) => typeof v === 'number' ? v.toLocaleString() : String(v)} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }} />
                       <Legend wrapperStyle={{ fontSize: 12 }} />
-                      <Line type="linear" dataKey="루나" stroke="#9333ea" strokeWidth={2} dot={{ r: 3, fill: '#9333ea' }} activeDot={{ r: 5 }} />
-                      <Line type="linear" dataKey="별" stroke="#eab308" strokeWidth={2} dot={{ r: 3, fill: '#eab308' }} activeDot={{ r: 5 }} />
+                      {GUILDS.filter(g => effectiveGuilds.includes(g.key)).map(g => (
+                        <Line key={g.key} type="linear" dataKey={g.key} stroke={g.line} strokeWidth={2} dot={{ r: 3, fill: g.line }} activeDot={{ r: 5 }} />
+                      ))}
                     </LineChart>
                   </ResponsiveContainer>
                   {chartData.length >= 1 && (() => {
                     const last = chartData[chartData.length - 1]
                     const prev = chartData.length > 1 ? chartData[chartData.length - 2] : null
                     return (
-                      <div className="grid grid-cols-2 gap-3 mt-4">
-                        {([
-                          { label: '🌙 루나', total: last.루나, diff: prev ? last.루나 - prev.루나 : null, color: 'text-purple-600' },
-                          { label: '⭐ 별', total: last.별, diff: prev ? last.별 - prev.별 : null, color: 'text-yellow-500' },
-                        ] as { label: string; total: number; diff: number | null; color: string }[]).map(g => (
-                          <div key={g.label} className="bg-slate-50 rounded-xl p-3 text-center">
-                            <div className={`text-xs font-medium mb-1 ${g.color}`}>{g.label}</div>
-                            <div className="text-lg font-bold text-slate-800">{g.total.toLocaleString()}</div>
-                            {g.diff !== null && (
-                              <div className={`text-xs mt-0.5 ${g.diff >= 0 ? 'text-rose-500' : 'text-blue-400'}`}>
-                                전주대비 {g.diff >= 0 ? '+' : ''}{g.diff.toLocaleString()}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                      <div className={`grid ${GRID_COLS[effectiveGuilds.length]} gap-3 mt-4`}>
+                        {GUILDS.filter(g => effectiveGuilds.includes(g.key)).map(g => {
+                          const total = last[g.key]
+                          const diff = prev ? last[g.key] - prev[g.key] : null
+                          return (
+                            <div key={g.key} className="bg-slate-50 rounded-xl p-3 text-center">
+                              <div className={`text-xs font-medium mb-1 ${g.accentStrong}`}>{g.emoji} {g.key}</div>
+                              <div className="text-lg font-bold text-slate-800">{total.toLocaleString()}</div>
+                              {diff !== null && (
+                                <div className={`text-xs mt-0.5 ${diff >= 0 ? 'text-rose-500' : 'text-blue-400'}`}>
+                                  전주대비 {diff >= 0 ? '+' : ''}{diff.toLocaleString()}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                     )
                   })()}
                   </>)}
                 </div>
+              ) : tab === '성장곡선' ? (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                  <p className="text-xs text-slate-400 text-center mb-1">평균 승급 주기 기준 성장 속도</p>
+                  <p className="text-[10px] text-slate-400 text-center mb-4">기준선(│) = 14일 주기(속도 1.0x) · 승급 기록 2회 이상부터 계산돼요</p>
+                  {growthData.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-16">아직 데이터가 부족해요</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {growthData.map(({ member: m, avgDays, speed }) => {
+                        const g = GUILDS.find(gd => gd.key === m.길드)
+                        const pct = Math.min(speed / 2, 1) * 100
+                        return (
+                          <div key={m.닉네임} className="flex items-center gap-2">
+                            <div className="w-24 flex items-center gap-1 shrink-0">
+                              {g && <span className="text-xs shrink-0">{g.emoji}</span>}
+                              <span className="text-xs text-slate-700 truncate">{m.닉네임}</span>
+                            </div>
+                            <div className="flex-1 relative bg-slate-100 rounded-full h-2.5">
+                              <div className="absolute top-0 bottom-0 left-1/2 w-px bg-slate-300" />
+                              <div
+                                className={`h-full rounded-full ${speed >= 1 ? 'bg-gradient-to-r from-orange-400 to-red-400' : 'bg-gradient-to-r from-sky-300 to-blue-400'}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <div className="w-14 text-right shrink-0 text-xs text-slate-500">{avgDays}일</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {noGrowthData.length > 0 && (
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <p className="text-[11px] text-slate-400 mb-2">기록 부족 ({noGrowthData.length}명)</p>
+                      <div className="flex flex-wrap gap-1">
+                        {noGrowthData.map(m => (
+                          <span key={m.닉네임} className="text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{m.닉네임}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
               <>
               <p className="text-xs text-slate-400 text-center mb-2">매일 11시, 23시 기준으로 데이터가 수집됩니다!</p>
 
-              {/* 길드 합산 카드 */}
-              <div className={`mb-3 ${tab === '전체' ? 'grid grid-cols-2 gap-2' : ''}`}>
-                {(tab === '전체' || tab === '루나') && (
-                  <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-purple-400">
-                    <div className="text-xs text-purple-400 mb-1 whitespace-nowrap">🌙 루나 · {lunaDone}/{luna.length}명 완료</div>
-                    <div className="text-xl font-bold text-purple-600 tabular-nums">{lunaTotal.toLocaleString()}</div>
-                  </div>
-                )}
-                {(tab === '전체' || tab === '별') && (
-                  <div className="rounded-xl px-4 py-3 shadow-sm bg-white border-2 border-yellow-400">
-                    <div className="text-xs text-yellow-500 mb-1 whitespace-nowrap">⭐ 별 · {starDone}/{star.length}명 완료</div>
-                    <div className="text-xl font-bold text-yellow-500 tabular-nums">{starTotal.toLocaleString()}</div>
-                  </div>
-                )}
+              {/* 멤버 리스트 (길드별) */}
+              <div className="grid grid-cols-3 gap-2">
+                {GUILDS.map(g => {
+                  const guildMembers = numbered.filter(m => m.길드 === g.key)
+                  return (
+                    <div key={g.key}>
+                      <div className={`text-xs font-bold mb-1.5 px-1 ${g.accentStrong}`}>{g.emoji} {g.key}</div>
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        {guildMembers.map((m, i) => (
+                          <div
+                            key={i}
+                            onClick={() => setExpandedMember(prev => prev === m.닉네임 ? null : m.닉네임)}
+                            className={`flex items-center gap-1 px-1.5 py-2.5 border-b border-slate-100 last:border-b-0 cursor-pointer active:opacity-70 ${
+                              m.promotion_warning_since ? 'bg-red-100/70' : g.rowBg
+                            }`}
+                          >
+                            <span className="text-[10px] text-slate-400 shrink-0 w-3 text-center">{m.idx}</span>
+                            <span className={`flex-1 truncate text-xs ${m.역할 === '길드마스터' ? 'font-bold text-slate-900' : 'font-semibold text-slate-800'}`}>
+                              {(m.역할 === '길드마스터' || m.역할 === '부길드마스터') && '👑'}
+                              {m.닉네임}
+                            </span>
+                            <span className="shrink-0">
+                              {HAS_IMAGE.has(m.승급) ? (
+                                <Image src={`/promotion/${m.승급}.webp`} alt={m.승급} width={20} height={20} title={m.승급} />
+                              ) : m.승급 ? (
+                                <span className="text-[9px] text-slate-400">{m.승급}</span>
+                              ) : null}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
 
-              {/* 멤버 리스트 */}
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                {/* 헤더 */}
-                <div className="flex items-center px-4 py-2 bg-slate-50 border-b-2 border-slate-200 text-xs text-slate-400 font-medium">
-                  <span className="w-6 shrink-0 text-center">#</span>
-                  {tab === '전체' && <span className="w-10 shrink-0 text-center">길드</span>}
-                  <span className="flex-1 text-center">닉네임</span>
-                  <span className="w-10 text-center shrink-0">승급</span>
-                  <span className="w-28 text-center shrink-0 leading-tight">용협<br/><span className="text-slate-300 font-normal" style={{fontSize:'10px'}}>전날대비</span></span>
-                </div>
-                {numbered.map((m, i) => (
-                  <Fragment key={i}>
-                  <div
-                    onClick={() => setExpandedMember(prev => prev === m.닉네임 ? null : m.닉네임)}
-                    className={`flex items-center px-4 py-3.5 border-b border-slate-100 cursor-pointer active:opacity-70 ${
-                      expandedMember === m.닉네임 ? 'border-b-0' : ''
-                    } ${
-                      m.promotion_warning_since
-                        ? 'bg-red-100/70'
-                        : m.길드 === '루나' ? 'bg-purple-50/40' : 'bg-yellow-50/40'
-                    }`}
-                  >
-                    <span className="w-6 text-xs text-slate-400 shrink-0">{m.idx}</span>
-                    {tab === '전체' && (
-                      <span className={`w-10 text-xs font-bold shrink-0 text-center ${m.promotion_warning_since ? 'text-red-500' : m.길드 === '루나' ? 'text-purple-500' : 'text-yellow-500'}`}>
-                        {m.길드}
-                      </span>
-                    )}
-                    <div className="flex-1 flex flex-col items-center min-w-0">
-                      <span className={`text-[15px] truncate ${
-                        m.역할 === '길드마스터'
-                          ? 'font-bold text-slate-900'
-                          : 'font-semibold text-slate-800'
-                      }`}>
-                        {m.역할 === '길드마스터' && <span className="mr-1">👑</span>}
-                        {m.역할 === '부길드마스터' && <span className="mr-1" style={{filter:'grayscale(1) brightness(0.75)'}}>👑</span>}
-                        {m.닉네임}
-                      </span>
-                      {m.promotion_warning_since && (
-                        <WarningTimer since={m.promotion_warning_since} />
-                      )}
-                    </div>
-                    <div className="w-10 flex justify-center shrink-0">
-                      {HAS_IMAGE.has(m.승급) ? (
-                        <Image src={`/promotion/${m.승급}.webp`} alt={m.승급} width={28} height={28} title={m.승급} />
-                      ) : m.승급 ? (
-                        <span className="text-xs text-slate-400">{m.승급}</span>
-                      ) : null}
-                    </div>
-                    <div className="w-28 text-center shrink-0">
-                      <span className="text-sm text-slate-900 tabular-nums font-bold">
-                        {(() => { const n = Number(m.용협); return (!m.용협 || isNaN(n)) ? '-' : n.toLocaleString() })()}
-                      </span>
-                      {(() => {
-                        const hasScore = m.용협 && !isNaN(Number(m.용협))
-                        const diff = hasScore ? diffMap[m.닉네임] : null
-                        if (diff === null || diff === undefined) return null
-                        return (
-                          <span className={`block text-xs tabular-nums font-medium ${isFriday && diff <= FRIDAY_THRESHOLD ? 'text-slate-900' : diff < 0 ? 'text-blue-400' : diff > 0 ? 'text-rose-500' : 'text-slate-300'}`}>
-                            ({diff > 0 ? '+' : ''}{diff.toLocaleString()})
-                          </span>
-                        )
-                      })()}
-                    </div>
-                  </div>
-                  {expandedMember === m.닉네임 && (
-                    <MemberExpanded member={m} promotionHistory={promotionHistory} />
-                  )}
-                  </Fragment>
-                ))}
-              </div>
+              {(() => {
+                const expandedData = numbered.find(m => m.닉네임 === expandedMember)
+                return expandedData ? <MemberExpanded member={expandedData} promotionHistory={promotionHistory} onClose={() => setExpandedMember(null)} /> : null
+              })()}
 
 {/* 통계 토글 */}
               <button
@@ -884,31 +716,28 @@ export default function Home() {
 
               {showStats && (
                 <div className="mt-2 bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-4">
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { label: '🌙 루나', count: luna.length, avg: lunaAvg, next: lunaNext, interval: lunaInterval, bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600' },
-                      { label: '⭐ 별',  count: star.length, avg: starAvg,  next: starNext,  interval: starInterval,  bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-600' },
-                    ].map(c => (
-                      <div key={c.label} className={`${c.bg} border ${c.border} rounded-lg p-3 text-center`}>
-                        <div className={`${c.text} text-xs font-medium mb-2`}>{c.label}</div>
-                        {c.avg && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {guildStats.map(g => (
+                      <div key={g.key} className={`${g.statBg} border ${g.statBorder} rounded-lg p-3 text-center`}>
+                        <div className={`${g.accentStrong} text-xs font-medium mb-2`}>{g.emoji} {g.key}</div>
+                        {g.avg && (
                           <div className="flex flex-col items-center gap-1 mb-1">
-                            {HAS_IMAGE.has(c.avg) && <Image src={`/promotion/${c.avg}.webp`} alt={c.avg} width={36} height={36} />}
-                            <span className="text-sm font-bold text-slate-800">{c.avg}</span>
+                            {HAS_IMAGE.has(g.avg) && <Image src={`/promotion/${g.avg}.webp`} alt={g.avg} width={36} height={36} />}
+                            <span className="text-sm font-bold text-slate-800">{g.avg}</span>
                           </div>
                         )}
-                        {c.next && (
+                        {g.next && (
                           <div className="text-[11px] text-slate-500 mb-1">
-                            다음({c.next.next.slice(0, 4)})까지 <span className="font-bold text-slate-700">{c.next.steps}명</span>
+                            다음({g.next.next.slice(0, 4)})까지 <span className="font-bold text-slate-700">{g.next.steps}명</span>
                           </div>
                         )}
                         <div className="mt-1">
-                          <span className="text-xs text-slate-500">{c.count}명</span>
+                          <span className="text-xs text-slate-500">{g.members.length}명</span>
                         </div>
                       </div>
                     ))}
                   </div>
-                  <DistributionChart members={members} tab={tab} />
+                  <DistributionChart members={members} />
                 </div>
               )}
 

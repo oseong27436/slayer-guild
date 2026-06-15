@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { GUILDS } from '../../lib/guilds'
 
 const SUPABASE_URL = process.env.SUPABASE_URL!
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY!
@@ -51,8 +52,8 @@ const ROLE_ORDER: Record<string, number> = { '길드마스터': 0, '부길드마
 async function handleSort(chatId: number) {
   const members = await getMembers()
 
-  const sorted = ['루나', '별'].flatMap(guild => {
-    const guildMembers = members.filter(m => m.길드 === guild)
+  const sorted = GUILDS.flatMap(g => {
+    const guildMembers = members.filter(m => m.길드 === g.key)
     return guildMembers.sort((a, b) => {
       const aRole = ROLE_ORDER[a.역할] ?? 2
       const bRole = ROLE_ORDER[b.역할] ?? 2
@@ -71,9 +72,9 @@ async function handleSort(chatId: number) {
     )
   )
 
-  const lines = ['루나', '별'].map(guild => {
-    const gm = sorted.filter(m => m.길드 === guild)
-    return `${guild === '루나' ? '🌙' : '⭐'} <b>${guild}</b>\n` + gm.map((m, i) => `  ${i + 1}. ${m.닉네임} (${m.승급})`).join('\n')
+  const lines = GUILDS.map(g => {
+    const gm = sorted.filter(m => m.길드 === g.key)
+    return `${g.emoji} <b>${g.key}</b>\n` + gm.map((m, i) => `  ${i + 1}. ${m.닉네임} (${m.승급})`).join('\n')
   })
 
   await telegramReply(chatId, `✅ <b>정렬 완료</b>\n\n${lines.join('\n\n')}`)
@@ -98,30 +99,22 @@ function nextPromotionSteps(avgValue: number, count: number) {
 
 async function handleHyunhwang(chatId: number) {
   const members = await getMembers()
-  const luna = members.filter(m => m.길드 === '루나')
-  const star = members.filter(m => m.길드 === '별')
-  const lunaTotal = luna.reduce((s, m) => s + (Number(m.용협) || 0), 0)
-  const starTotal = star.reduce((s, m) => s + (Number(m.용협) || 0), 0)
-  const lunaAvg = avgPromotion(luna)
-  const starAvg = avgPromotion(star)
-  const lunaNext = lunaAvg ? nextPromotionSteps(lunaAvg.value, lunaAvg.count) : null
-  const starNext = starAvg ? nextPromotionSteps(starAvg.value, starAvg.count) : null
 
-  const text = [
-    '⚔️ <b>길드 현황</b>',
-    '',
-    `🌙 <b>루나</b> (${luna.length}명)`,
-    `  용협 합산: ${lunaTotal.toLocaleString()}`,
-    `  평균 승급: ${lunaAvg?.name ?? '-'}`,
-    lunaNext ? `  다음(${lunaNext.next})까지: ${lunaNext.steps}번` : '  최고 등급',
-    '',
-    `⭐ <b>별</b> (${star.length}명)`,
-    `  용협 합산: ${starTotal.toLocaleString()}`,
-    `  평균 승급: ${starAvg?.name ?? '-'}`,
-    starNext ? `  다음(${starNext.next})까지: ${starNext.steps}번` : '  최고 등급',
-  ].join('\n')
+  const lines = ['⚔️ <b>길드 현황</b>', '']
+  GUILDS.forEach((g, i) => {
+    const guildMembers = members.filter(m => m.길드 === g.key)
+    const total = guildMembers.reduce((s, m) => s + (Number(m.용협) || 0), 0)
+    const avg = avgPromotion(guildMembers)
+    const next = avg ? nextPromotionSteps(avg.value, avg.count) : null
 
-  await telegramReply(chatId, text)
+    if (i > 0) lines.push('')
+    lines.push(`${g.emoji} <b>${g.key}</b> (${guildMembers.length}명)`)
+    lines.push(`  용협 합산: ${total.toLocaleString()}`)
+    lines.push(`  평균 승급: ${avg?.name ?? '-'}`)
+    lines.push(next ? `  다음(${next.next})까지: ${next.steps}번` : '  최고 등급')
+  })
+
+  await telegramReply(chatId, lines.join('\n'))
 }
 
 
