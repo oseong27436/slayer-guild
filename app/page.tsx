@@ -124,7 +124,6 @@ function DistributionChart({ members }: { members: Member[] }) {
 function NickChangeModal({ members, onClose }: { members: Member[], onClose: () => void }) {
   const [현재닉네임, set현재닉네임] = useState('')
   const [요청닉네임, set요청닉네임] = useState('')
-  const [사유, set사유] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
   const submit = async () => {
@@ -133,7 +132,7 @@ function NickChangeModal({ members, onClose }: { members: Member[], onClose: () 
     const res = await fetch('/api/nick-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 현재닉네임, 요청닉네임: 요청닉네임.trim(), 사유: 사유.trim() || null }),
+      body: JSON.stringify({ 현재닉네임, 요청닉네임: 요청닉네임.trim() }),
     })
     setStatus(res.ok ? 'done' : 'error')
   }
@@ -165,15 +164,7 @@ function NickChangeModal({ members, onClose }: { members: Member[], onClose: () 
                 value={요청닉네임}
                 onChange={e => set요청닉네임(e.target.value)}
                 placeholder="변경할 닉네임"
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-1 focus:ring-purple-400"
-              />
-
-              <textarea
-                value={사유}
-                onChange={e => set사유(e.target.value)}
-                placeholder="이동 희망 사유 적어주세요. (선택사항)"
-                rows={3}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-4 resize-none focus:outline-none focus:ring-1 focus:ring-purple-400"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-4 focus:outline-none focus:ring-1 focus:ring-purple-400"
               />
 
               <div className="flex gap-2">
