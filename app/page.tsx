@@ -120,14 +120,78 @@ function DistributionChart({ members }: { members: Member[] }) {
   )
 }
 
-const PROMOTION_LIST = [
-  '스톤', '브론즈', '아이언', '실버', '골드',
-  '미스릴', '오리하르콘', '아케이나이트', '아다만타이트',
-  '에테르', '블랙미스릴', '데몬메탈', '드라고노스',
-  '라그나블러드', '워프로스트', '다크녹스', '블루어비스',
-  '인피넌트', '사이클로스', '에이션트케나인', '기가로크',
-  '아이젠하르트', '다이아더스트', '엘든우드', '블리츠골드',
-]
+
+function GuildTransferModal({ members, onClose }: { members: Member[], onClose: () => void }) {
+  const [닉네임, set닉네임] = useState('')
+  const [요청길드, set요청길드] = useState<GuildKey | ''>('')
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+
+  const current = members.find(m => m.닉네임 === 닉네임)?.길드 || ''
+
+  const submit = async () => {
+    if (!닉네임 || !요청길드) return
+    setStatus('loading')
+    const res = await fetch('/api/guild-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 닉네임, 현재길드: current, 요청길드 }),
+    })
+    setStatus(res.ok ? 'done' : 'error')
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="px-6 pt-6 pb-4">
+          <h2 className="text-lg font-bold text-slate-800 mb-4 text-center">🏰 길드 이동 요청</h2>
+          {status === 'done' ? (
+            <div className="text-center py-6">
+              <p className="text-2xl mb-2">🎉</p>
+              <p className="text-green-600 font-medium">요청이 접수됐어요!</p>
+              <p className="text-slate-400 text-sm mt-1">길드마스터 승인 후 반영됩니다</p>
+              <button onClick={onClose} className="mt-5 bg-slate-100 rounded-xl px-8 py-2.5 text-sm font-medium">닫기</button>
+            </div>
+          ) : (
+            <>
+              <select
+                value={닉네임}
+                onChange={e => { set닉네임(e.target.value); set요청길드('') }}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-4"
+              >
+                <option value="">닉네임을 선택하세요</option>
+                {members.map(m => <option key={m.닉네임} value={m.닉네임}>{m.닉네임} ({m.길드})</option>)}
+              </select>
+
+              <div className="flex gap-2 mb-5">
+                {GUILDS.filter(g => !닉네임 || g.key !== current).map(g => (
+                  <button
+                    key={g.key}
+                    onClick={() => set요청길드(g.key)}
+                    className={`flex-1 py-3 rounded-xl text-sm font-medium transition ${요청길드 === g.key ? g.active : 'bg-slate-100 text-slate-500'}`}
+                  >
+                    {g.emoji} {g.key}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={onClose} className="flex-1 border border-slate-200 rounded-xl py-2.5 text-sm text-slate-500">취소</button>
+                <button
+                  onClick={submit}
+                  disabled={!닉네임 || !요청길드 || status === 'loading'}
+                  className="flex-1 bg-purple-600 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-40"
+                >
+                  {status === 'loading' ? '전송 중...' : '요청하기'}
+                </button>
+              </div>
+              {status === 'error' && <p className="text-red-400 text-xs text-center mt-2">오류가 발생했어요</p>}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function PromotionRequestModal({ members, onClose }: { members: Member[], onClose: () => void }) {
   const [닉네임, set닉네임] = useState('')
@@ -135,15 +199,15 @@ function PromotionRequestModal({ members, onClose }: { members: Member[], onClos
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
   const current = members.find(m => m.닉네임 === 닉네임)?.승급 || ''
-  const 요청승급 = PROMOTION_LIST[idx]
+  const 요청승급 = PROMOTION_ORDER[idx]
 
-  const prev = () => setIdx(i => (i - 1 + PROMOTION_LIST.length) % PROMOTION_LIST.length)
-  const next = () => setIdx(i => (i + 1) % PROMOTION_LIST.length)
+  const prev = () => setIdx(i => (i - 1 + PROMOTION_ORDER.length) % PROMOTION_ORDER.length)
+  const next = () => setIdx(i => (i + 1) % PROMOTION_ORDER.length)
 
   const handleNickname = (name: string) => {
     set닉네임(name)
     const cur = members.find(m => m.닉네임 === name)?.승급 || ''
-    const curIdx = PROMOTION_LIST.indexOf(cur)
+    const curIdx = PROMOTION_ORDER.indexOf(cur)
     setIdx(curIdx >= 0 ? curIdx : 0)
   }
 
@@ -204,7 +268,7 @@ function PromotionRequestModal({ members, onClose }: { members: Member[], onClos
 
               {/* 인디케이터 */}
               <div className="flex justify-center gap-1 mb-5">
-                {PROMOTION_LIST.map((_, i) => (
+                {PROMOTION_ORDER.map((_, i) => (
                   <div key={i} onClick={() => setIdx(i)}
                     className={`h-1 rounded-full cursor-pointer transition-all ${i === idx ? 'w-4 bg-purple-500' : 'w-1 bg-slate-200'}`} />
                 ))}
@@ -320,6 +384,8 @@ export default function Home() {
   const [loadError, setLoadError] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
+  const [showGuildModal, setShowGuildModal] = useState(false)
+  const [fabOpen, setFabOpen] = useState(false)
   const [expandedMember, setExpandedMember] = useState<string | null>(null)
   const [heroImage, setHeroImage] = useState<HeroImage>(FALLBACK_IMAGES[0])
   const [heroVisible, setHeroVisible] = useState(true)
@@ -343,7 +409,7 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    const open = showRequestModal || expandedMember !== null
+    const open = showRequestModal || showGuildModal || expandedMember !== null
     document.body.style.overflow = open ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [showRequestModal, expandedMember])
@@ -513,14 +579,6 @@ export default function Home() {
             </div>
           ) : (
             <>
-              {/* 승급 변경 요청 버튼 */}
-              <button
-                onClick={() => setShowRequestModal(true)}
-                className="w-full mb-3 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-violet-500 text-white text-sm font-medium shadow-sm flex items-center justify-center gap-2"
-              >
-                ⬆️ 승급 변경 요청하기
-              </button>
-
               {/* 탭 + 정렬 */}
               <div className="flex gap-2 mb-3">
                 {tabs.map(t => (
@@ -767,15 +825,50 @@ export default function Home() {
               <div className="text-center mt-3">
                 <a href="/admin" className="text-xs text-slate-400 hover:text-slate-500 transition">⚙️ 관리자</a>
               </div>
-              {showRequestModal && (
-                <PromotionRequestModal members={members} onClose={() => setShowRequestModal(false)} />
-              )}
             </>
           )}
             </>
           )}
         </div>
       </div>
+
+      {/* FAB 백드롭 */}
+      {fabOpen && (
+        <div className="fixed inset-0 z-30" onClick={() => setFabOpen(false)} />
+      )}
+
+      {/* FAB */}
+      <div className="fixed bottom-6 right-4 z-40 flex flex-col items-end gap-3">
+        <div className={`flex flex-col items-end gap-3 transition-all duration-200 ${fabOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-3 pointer-events-none'}`}>
+          <button
+            onClick={() => { setShowGuildModal(true); setFabOpen(false) }}
+            className="flex items-center gap-2.5"
+          >
+            <span className="bg-white text-slate-700 text-xs font-medium shadow-md rounded-full px-3 py-1.5 whitespace-nowrap">🏰 길드 이동 요청</span>
+            <span className="w-11 h-11 rounded-full bg-yellow-500 shadow-md flex items-center justify-center text-xl shrink-0">🏰</span>
+          </button>
+          <button
+            onClick={() => { setShowRequestModal(true); setFabOpen(false) }}
+            className="flex items-center gap-2.5"
+          >
+            <span className="bg-white text-slate-700 text-xs font-medium shadow-md rounded-full px-3 py-1.5 whitespace-nowrap">⬆️ 승급 변경 요청</span>
+            <span className="w-11 h-11 rounded-full bg-purple-600 shadow-md flex items-center justify-center text-xl shrink-0">⬆️</span>
+          </button>
+        </div>
+        <button
+          onClick={() => setFabOpen(o => !o)}
+          className={`w-14 h-14 rounded-full bg-gradient-to-br from-purple-600 to-violet-500 text-white shadow-lg flex items-center justify-center text-3xl font-light transition-transform duration-200 ${fabOpen ? 'rotate-45' : ''}`}
+        >
+          +
+        </button>
+      </div>
+
+      {showRequestModal && (
+        <PromotionRequestModal members={members} onClose={() => setShowRequestModal(false)} />
+      )}
+      {showGuildModal && (
+        <GuildTransferModal members={members} onClose={() => setShowGuildModal(false)} />
+      )}
     </div>
   )
 }

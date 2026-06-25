@@ -17,6 +17,14 @@ interface PromotionRequest {
   요청일: string
 }
 
+interface GuildRequest {
+  id: string
+  닉네임: string
+  현재길드: string
+  요청길드: string
+  요청일: string
+}
+
 
 const PROMOTION_ORDER = [
   '스톤', '브론즈', '아이언', '실버', '골드',
@@ -634,6 +642,7 @@ export default function AdminPage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [requests, setRequests] = useState<PromotionRequest[]>([])
+  const [guildRequests, setGuildRequests] = useState<GuildRequest[]>([])
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -647,6 +656,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetch('/api/promotion-request').then(r => r.json()).then(setRequests).catch(() => {})
+    fetch('/api/guild-request').then(r => r.json()).then(setGuildRequests).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -664,6 +674,17 @@ export default function AdminPage() {
       body: JSON.stringify({ id: req.id, action, 닉네임: req.닉네임, 요청승급: req.요청승급 }),
     })
     setRequests(prev => prev.filter(r => r.id !== req.id))
+    setActionLoading(null)
+  }
+
+  const handleGuildAction = async (req: GuildRequest, action: 'approve' | 'reject') => {
+    setActionLoading(req.id)
+    await fetch('/api/guild-request', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: req.id, action, 닉네임: req.닉네임, 요청길드: req.요청길드 }),
+    })
+    setGuildRequests(prev => prev.filter(r => r.id !== req.id))
     setActionLoading(null)
   }
 
@@ -714,6 +735,39 @@ export default function AdminPage() {
         {showEditModal && <EditMemberModal onClose={() => setShowEditModal(false)} />}
         {showReorderModal && <ReorderModal onClose={() => setShowReorderModal(false)} />}
         {showBannerModal && <HeroBannerModal onClose={() => setShowBannerModal(false)} />}
+
+        {/* 길드 이동 요청 */}
+        {guildRequests.length > 0 && (
+          <div className="mb-4 bg-sky-900/30 border border-sky-700/50 rounded-xl p-4">
+            <h2 className="text-sm font-bold text-sky-400 mb-3">🏰 길드 이동 요청 ({guildRequests.length}건)</h2>
+            <div className="space-y-2">
+              {guildRequests.map(req => (
+                <div key={req.id} className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-2">
+                  <div className="flex-1 text-sm">
+                    <span className="font-medium text-white">{req.닉네임}</span>
+                    <span className="text-slate-400 mx-1">·</span>
+                    <span className="text-slate-400 text-xs">{req.현재길드} → </span>
+                    <span className="text-sky-300 text-xs font-medium">{req.요청길드}</span>
+                  </div>
+                  <button
+                    onClick={() => handleGuildAction(req, 'approve')}
+                    disabled={actionLoading === req.id}
+                    className="text-xs bg-green-700 hover:bg-green-600 text-white rounded-lg px-3 py-1.5 disabled:opacity-40"
+                  >
+                    승인
+                  </button>
+                  <button
+                    onClick={() => handleGuildAction(req, 'reject')}
+                    disabled={actionLoading === req.id}
+                    className="text-xs bg-red-800 hover:bg-red-700 text-white rounded-lg px-3 py-1.5 disabled:opacity-40"
+                  >
+                    거절
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 승급 변경 요청 */}
         {requests.length > 0 && (
