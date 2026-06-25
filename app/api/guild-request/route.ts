@@ -25,7 +25,7 @@ async function telegramSend(text: string, id: string) {
 }
 
 export async function POST(req: Request) {
-  const { 닉네임, 현재길드, 요청길드 } = await req.json()
+  const { 닉네임, 현재길드, 요청길드, 사유 } = await req.json()
   if (!닉네임 || !요청길드) return NextResponse.json({ error: '필수값 누락' }, { status: 400 })
 
   const today = new Date().toISOString().slice(0, 10)
@@ -37,17 +37,17 @@ export async function POST(req: Request) {
       'Content-Type': 'application/json',
       'Prefer': 'return=representation',
     },
-    body: JSON.stringify({ 닉네임, 현재길드: 현재길드 || '미확인', 요청길드, 상태: '대기', 요청일: today }),
+    body: JSON.stringify({ 닉네임, 현재길드: 현재길드 || '미확인', 요청길드, 사유: 사유 || null, 상태: '대기', 요청일: today }),
   })
   if (!res.ok) return NextResponse.json({ error: '저장 실패' }, { status: 500 })
 
   const rows: { id: string }[] = await res.json()
   const id = rows[0]?.id ?? 'unknown'
 
-  await telegramSend(
-    `🏰 <b>길드 이동 요청</b>\n\n${닉네임}: ${현재길드 || '?'} → ${요청길드}`,
-    id
-  )
+  const text = 사유
+    ? `🏰 <b>길드 이동 요청</b>\n\n${닉네임}: ${현재길드 || '?'} → ${요청길드}\n사유: ${사유}`
+    : `🏰 <b>길드 이동 요청</b>\n\n${닉네임}: ${현재길드 || '?'} → ${요청길드}`
+  await telegramSend(text, id)
 
   return NextResponse.json({ ok: true })
 }

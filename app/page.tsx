@@ -124,6 +124,7 @@ function DistributionChart({ members }: { members: Member[] }) {
 function GuildTransferModal({ members, onClose }: { members: Member[], onClose: () => void }) {
   const [닉네임, set닉네임] = useState('')
   const [요청길드, set요청길드] = useState<GuildKey | ''>('')
+  const [사유, set사유] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
   const current = members.find(m => m.닉네임 === 닉네임)?.길드 || ''
@@ -134,7 +135,7 @@ function GuildTransferModal({ members, onClose }: { members: Member[], onClose: 
     const res = await fetch('/api/guild-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 닉네임, 현재길드: current, 요청길드 }),
+      body: JSON.stringify({ 닉네임, 현재길드: current, 요청길드, 사유: 사유.trim() || null }),
     })
     setStatus(res.ok ? 'done' : 'error')
   }
@@ -162,7 +163,7 @@ function GuildTransferModal({ members, onClose }: { members: Member[], onClose: 
                 {members.map(m => <option key={m.닉네임} value={m.닉네임}>{m.닉네임} ({m.길드})</option>)}
               </select>
 
-              <div className="flex gap-2 mb-5">
+              <div className="flex gap-2 mb-4">
                 {GUILDS.filter(g => !닉네임 || g.key !== current).map(g => (
                   <button
                     key={g.key}
@@ -173,6 +174,14 @@ function GuildTransferModal({ members, onClose }: { members: Member[], onClose: 
                   </button>
                 ))}
               </div>
+
+              <textarea
+                value={사유}
+                onChange={e => set사유(e.target.value)}
+                placeholder="이동 희망 사유 적어주세요. (선택사항)"
+                rows={3}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-4 resize-none focus:outline-none focus:ring-1 focus:ring-purple-400"
+              />
 
               <div className="flex gap-2">
                 <button onClick={onClose} className="flex-1 border border-slate-200 rounded-xl py-2.5 text-sm text-slate-500">취소</button>
