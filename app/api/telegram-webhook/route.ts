@@ -143,6 +143,43 @@ async function getRequest(id: string) {
   return rows[0] ?? null
 }
 
+async function getGuildRequest(id: string) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/slayer_guild_requests?id=eq.${id}&select=닉네임,요청길드`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+  })
+  const rows: { 닉네임: string; 요청길드: string }[] = await res.json()
+  return rows[0] ?? null
+}
+
+async function handleGuildApprove(id: string, chatId: number, messageId: number, callbackQueryId: string) {
+  const req = await getGuildRequest(id)
+  if (!req) { await answerCallback(callbackQueryId); return }
+  await fetch(`${SUPABASE_URL}/rest/v1/slayer_guild_requests?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 상태: '승인' }),
+  })
+  await fetch(`${SUPABASE_URL}/rest/v1/slayer_members?닉네임=eq.${encodeURIComponent(req.닉네임)}`, {
+    method: 'PATCH',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 길드: req.요청길드 }),
+  })
+  await answerCallback(callbackQueryId)
+  await editMessage(chatId, messageId, `✅ <b>길드 이동 승인 완료</b>\n\n${req.닉네임} → ${req.요청길드}`)
+}
+
+async function handleGuildReject(id: string, chatId: number, messageId: number, callbackQueryId: string) {
+  const req = await getGuildRequest(id)
+  if (!req) { await answerCallback(callbackQueryId); return }
+  await fetch(`${SUPABASE_URL}/rest/v1/slayer_guild_requests?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 상태: '거절' }),
+  })
+  await answerCallback(callbackQueryId)
+  await editMessage(chatId, messageId, `❌ <b>길드 이동 거부</b>\n\n${req.닉네임} → ${req.요청길드}`)
+}
+
 async function handleApprove(id: string, chatId: number, messageId: number, callbackQueryId: string) {
   const req = await getRequest(id)
   if (!req) { await answerCallback(callbackQueryId); return }
@@ -192,6 +229,8 @@ export async function POST(req: Request) {
 
     if (action === 'approve') await handleApprove(requestId, chatId, messageId, callbackQueryId)
     else if (action === 'reject') await handleReject(requestId, chatId, messageId, callbackQueryId)
+    else if (action === 'guild_approve') await handleGuildApprove(requestId, chatId, messageId, callbackQueryId)
+    else if (action === 'guild_reject') await handleGuildReject(requestId, chatId, messageId, callbackQueryId)
   }
 
   return NextResponse.json({ ok: true })
