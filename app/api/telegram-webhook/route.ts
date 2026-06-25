@@ -151,6 +151,51 @@ async function getGuildRequest(id: string) {
   return rows[0] ?? null
 }
 
+async function getNickRequest(id: string) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/slayer_nick_requests?id=eq.${id}&select=현재닉네임,요청닉네임`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+  })
+  const rows: { 현재닉네임: string; 요청닉네임: string }[] = await res.json()
+  return rows[0] ?? null
+}
+
+async function handleNickApprove(id: string, chatId: number, messageId: number, callbackQueryId: string) {
+  const req = await getNickRequest(id)
+  if (!req) { await answerCallback(callbackQueryId); return }
+  await fetch(`${SUPABASE_URL}/rest/v1/slayer_nick_requests?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 상태: '승인' }),
+  })
+  const tables = [
+    { url: `slayer_members?닉네임=eq.${encodeURIComponent(req.현재닉네임)}`, body: { 닉네임: req.요청닉네임 } },
+    { url: `slayer_history?member_name=eq.${encodeURIComponent(req.현재닉네임)}`, body: { member_name: req.요청닉네임 } },
+    { url: `slayer_promotion_requests?닉네임=eq.${encodeURIComponent(req.현재닉네임)}`, body: { 닉네임: req.요청닉네임 } },
+    { url: `slayer_guild_requests?닉네임=eq.${encodeURIComponent(req.현재닉네임)}`, body: { 닉네임: req.요청닉네임 } },
+  ]
+  await Promise.all(tables.map(t =>
+    fetch(`${SUPABASE_URL}/rest/v1/${t.url}`, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(t.body),
+    })
+  ))
+  await answerCallback(callbackQueryId)
+  await editMessage(chatId, messageId, `✅ <b>닉네임 변경 승인 완료</b>\n\n${req.현재닉네임} → ${req.요청닉네임}`)
+}
+
+async function handleNickReject(id: string, chatId: number, messageId: number, callbackQueryId: string) {
+  const req = await getNickRequest(id)
+  if (!req) { await answerCallback(callbackQueryId); return }
+  await fetch(`${SUPABASE_URL}/rest/v1/slayer_nick_requests?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 상태: '거절' }),
+  })
+  await answerCallback(callbackQueryId)
+  await editMessage(chatId, messageId, `❌ <b>닉네임 변경 거부</b>\n\n${req.현재닉네임} → ${req.요청닉네임}`)
+}
+
 async function handleGuildApprove(id: string, chatId: number, messageId: number, callbackQueryId: string) {
   const req = await getGuildRequest(id)
   if (!req) { await answerCallback(callbackQueryId); return }
@@ -231,6 +276,8 @@ export async function POST(req: Request) {
     else if (action === 'reject') await handleReject(requestId, chatId, messageId, callbackQueryId)
     else if (action === 'guild_approve') await handleGuildApprove(requestId, chatId, messageId, callbackQueryId)
     else if (action === 'guild_reject') await handleGuildReject(requestId, chatId, messageId, callbackQueryId)
+    else if (action === 'nick_approve') await handleNickApprove(requestId, chatId, messageId, callbackQueryId)
+    else if (action === 'nick_reject') await handleNickReject(requestId, chatId, messageId, callbackQueryId)
   }
 
   return NextResponse.json({ ok: true })

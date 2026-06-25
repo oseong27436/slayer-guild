@@ -121,6 +121,80 @@ function DistributionChart({ members }: { members: Member[] }) {
 }
 
 
+function NickChangeModal({ members, onClose }: { members: Member[], onClose: () => void }) {
+  const [현재닉네임, set현재닉네임] = useState('')
+  const [요청닉네임, set요청닉네임] = useState('')
+  const [사유, set사유] = useState('')
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+
+  const submit = async () => {
+    if (!현재닉네임 || !요청닉네임.trim() || 현재닉네임 === 요청닉네임.trim()) return
+    setStatus('loading')
+    const res = await fetch('/api/nick-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 현재닉네임, 요청닉네임: 요청닉네임.trim(), 사유: 사유.trim() || null }),
+    })
+    setStatus(res.ok ? 'done' : 'error')
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="px-6 pt-6 pb-4">
+          <h2 className="text-lg font-bold text-slate-800 mb-4 text-center">✏️ 닉네임 변경 요청</h2>
+          {status === 'done' ? (
+            <div className="text-center py-6">
+              <p className="text-2xl mb-2">🎉</p>
+              <p className="text-green-600 font-medium">요청이 접수됐어요!</p>
+              <p className="text-slate-400 text-sm mt-1">길드마스터 승인 후 반영됩니다</p>
+              <button onClick={onClose} className="mt-5 bg-slate-100 rounded-xl px-8 py-2.5 text-sm font-medium">닫기</button>
+            </div>
+          ) : (
+            <>
+              <select
+                value={현재닉네임}
+                onChange={e => set현재닉네임(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-3"
+              >
+                <option value="">현재 닉네임을 선택하세요</option>
+                {members.map(m => <option key={m.닉네임} value={m.닉네임}>{m.닉네임} ({m.길드})</option>)}
+              </select>
+
+              <input
+                value={요청닉네임}
+                onChange={e => set요청닉네임(e.target.value)}
+                placeholder="변경할 닉네임"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-1 focus:ring-purple-400"
+              />
+
+              <textarea
+                value={사유}
+                onChange={e => set사유(e.target.value)}
+                placeholder="이동 희망 사유 적어주세요. (선택사항)"
+                rows={3}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm mb-4 resize-none focus:outline-none focus:ring-1 focus:ring-purple-400"
+              />
+
+              <div className="flex gap-2">
+                <button onClick={onClose} className="flex-1 border border-slate-200 rounded-xl py-2.5 text-sm text-slate-500">취소</button>
+                <button
+                  onClick={submit}
+                  disabled={!현재닉네임 || !요청닉네임.trim() || 현재닉네임 === 요청닉네임.trim() || status === 'loading'}
+                  className="flex-1 bg-purple-600 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-40"
+                >
+                  {status === 'loading' ? '전송 중...' : '요청하기'}
+                </button>
+              </div>
+              {status === 'error' && <p className="text-red-400 text-xs text-center mt-2">오류가 발생했어요</p>}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function GuildTransferModal({ members, onClose }: { members: Member[], onClose: () => void }) {
   const [닉네임, set닉네임] = useState('')
   const [요청길드, set요청길드] = useState<GuildKey | ''>('')
@@ -394,6 +468,7 @@ export default function Home() {
   const [showStats, setShowStats] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [showGuildModal, setShowGuildModal] = useState(false)
+  const [showNickModal, setShowNickModal] = useState(false)
   const [fabOpen, setFabOpen] = useState(false)
   const [expandedMember, setExpandedMember] = useState<string | null>(null)
   const [heroImage, setHeroImage] = useState<HeroImage>(FALLBACK_IMAGES[0])
@@ -418,7 +493,7 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    const open = showRequestModal || showGuildModal || expandedMember !== null
+    const open = showRequestModal || showGuildModal || showNickModal || expandedMember !== null
     document.body.style.overflow = open ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [showRequestModal, expandedMember])
@@ -857,6 +932,13 @@ export default function Home() {
             <span className="w-11 h-11 rounded-full bg-yellow-500 shadow-md flex items-center justify-center text-xl shrink-0">🏰</span>
           </button>
           <button
+            onClick={() => { setShowNickModal(true); setFabOpen(false) }}
+            className="flex items-center gap-2.5"
+          >
+            <span className="bg-white text-slate-700 text-xs font-medium shadow-md rounded-full px-3 py-1.5 whitespace-nowrap">✏️ 닉네임 변경 요청</span>
+            <span className="w-11 h-11 rounded-full bg-teal-500 shadow-md flex items-center justify-center text-xl shrink-0">✏️</span>
+          </button>
+          <button
             onClick={() => { setShowRequestModal(true); setFabOpen(false) }}
             className="flex items-center gap-2.5"
           >
@@ -877,6 +959,9 @@ export default function Home() {
       )}
       {showGuildModal && (
         <GuildTransferModal members={members} onClose={() => setShowGuildModal(false)} />
+      )}
+      {showNickModal && (
+        <NickChangeModal members={members} onClose={() => setShowNickModal(false)} />
       )}
     </div>
   )
