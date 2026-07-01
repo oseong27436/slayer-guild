@@ -13,6 +13,7 @@ interface Member {
   역할: string
   용협: string
   promotion_warning_since: string | null
+  용협체크일: string | null
 }
 
 interface HistoryEntry {
@@ -367,14 +368,30 @@ function PromotionRequestModal({ members, onClose }: { members: Member[], onClos
   )
 }
 
-function MemberExpanded({ member, promotionHistory, onClose }: { member: Member; promotionHistory: PromotionHistoryEntry[]; onClose: () => void }) {
+function MemberExpanded({ member, promotionHistory, onClose, onCheck }: { member: Member; promotionHistory: PromotionHistoryEntry[]; onClose: () => void; onCheck: (닉네임: string, today: string) => void }) {
   const upHistory = getUpHistory(member.닉네임, promotionHistory)
   const avgDays = getAvgDays(upHistory)
   const recent = [...upHistory].reverse()
+  const [checking, setChecking] = useState(false)
+
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+  const checked = member.용협체크일 === today
 
   const isOnFire = avgDays !== null && avgDays <= 14
 
   const guild = GUILDS.find(g => g.key === member.길드)
+
+  const handleCheck = async () => {
+    if (checked || checking) return
+    setChecking(true)
+    const res = await fetch('/api/yonghyup-check', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 닉네임: member.닉네임 }),
+    })
+    if (res.ok) onCheck(member.닉네임, today)
+    setChecking(false)
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={onClose}>
@@ -388,6 +405,18 @@ function MemberExpanded({ member, promotionHistory, onClose }: { member: Member;
         <button onClick={onClose} className="ml-auto -m-2 p-2 text-slate-400 text-2xl leading-none">&times;</button>
       </div>
       <div className="p-4 overflow-y-auto overscroll-contain">
+      {/* 용협 체크 버튼 */}
+      <button
+        onClick={handleCheck}
+        disabled={checked || checking}
+        className={`w-full py-2.5 rounded-xl text-sm font-medium mb-3 transition ${
+          checked
+            ? 'bg-green-50 text-green-600 border border-green-200 cursor-default'
+            : 'bg-blue-500 text-white active:opacity-80 disabled:opacity-50'
+        }`}
+      >
+        {checked ? '✅ 오늘 용협 완료!' : checking ? '처리 중...' : '⚔️ 용협 완료 체크'}
+      </button>
       <div className="grid grid-cols-2 gap-2 mb-3">
         <div className="bg-white rounded-xl p-3 text-center shadow-sm">
           <div className="text-xl font-bold text-slate-800">
@@ -510,6 +539,8 @@ export default function Home() {
   }
 
   useEffect(() => { loadData() }, [])
+
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
 
   const guildStats = GUILDS.map(g => {
     const list = members.filter(m => m.길드 === g.key)
@@ -828,7 +859,9 @@ export default function Home() {
                             key={i}
                             onClick={() => setExpandedMember(prev => prev === m.닉네임 ? null : m.닉네임)}
                             className={`flex items-center gap-1 px-1.5 py-2.5 border-b border-slate-100 last:border-b-0 cursor-pointer active:opacity-70 ${
-                              m.promotion_warning_since ? 'bg-red-100/70' : g.rowBg
+                              m.promotion_warning_since ? 'bg-red-100/70' :
+                              m.용협체크일 === today ? g.checkedRowBg :
+                              g.rowBg
                             }`}
                           >
                             <span className="text-[10px] text-slate-400 shrink-0 w-3 text-center">{m.idx}</span>
@@ -853,7 +886,14 @@ export default function Home() {
 
               {(() => {
                 const expandedData = numbered.find(m => m.닉네임 === expandedMember)
-                return expandedData ? <MemberExpanded member={expandedData} promotionHistory={promotionHistory} onClose={() => setExpandedMember(null)} /> : null
+                return expandedData ? (
+                  <MemberExpanded
+                    member={expandedData}
+                    promotionHistory={promotionHistory}
+                    onClose={() => setExpandedMember(null)}
+                    onCheck={(닉네임, checkDate) => setMembers(prev => prev.map(m => m.닉네임 === 닉네임 ? { ...m, 용협체크일: checkDate } : m))}
+                  />
+                ) : null
               })()}
 
 {/* 통계 토글 */}
