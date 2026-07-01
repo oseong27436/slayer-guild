@@ -827,9 +827,9 @@ export default function Home() {
                             key={i}
                             onClick={() => setExpandedMember(prev => prev === m.닉네임 ? null : m.닉네임)}
                             className={`flex items-center gap-1 px-1.5 py-2.5 border-b border-slate-100 last:border-b-0 cursor-pointer active:opacity-70 ${
-                              m.promotion_warning_since ? 'bg-red-100/70' :
-                              m.용협체크일 === today ? g.checkedRowBg :
-                              g.rowBg
+                              m.용협체크일 === today ? g.checkedRowBg : g.rowBg
+                            } ${
+                              m.promotion_warning_since ? 'border-l-[3px] border-l-red-500' : ''
                             }`}
                           >
                             <span className="text-[10px] text-slate-400 shrink-0 w-3 text-center">{m.idx}</span>
