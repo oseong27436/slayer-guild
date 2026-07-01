@@ -38,7 +38,7 @@ export async function PATCH(req: Request) {
       const guildMembers = all.filter(m => m.길드 === g.key)
       const incomplete = guildMembers.filter(m => m.용협체크일 !== today)
       const cnt = incomplete.length
-      const base = `${g.emoji} ${g.key} : ${cnt}명`
+      const base = `${g.key} : ${cnt}명 남음`
       if (cnt > 0 && cnt < 5) {
         const names = incomplete.map(m => m.닉네임).join(', ')
         return `${base}\n  └ ${names}`
@@ -46,7 +46,7 @@ export async function PATCH(req: Request) {
       return base
     })
 
-    const text = `⚔️ <b>금일 용협 미완</b>\n\n${lines.join('\n')}`
+    const text = `${닉네임} 용협 완료\n\n###\n${lines.join('\n')}`
     await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
