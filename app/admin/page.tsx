@@ -640,15 +640,15 @@ function ReorderModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function getThisMonday() {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
+  const day = d.getDay()
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+  return d.toISOString().slice(0, 10)
+}
+
 export default function AdminPage() {
   const [role, setRole] = useState<'master' | 'manager'>('master')
-  const [date, setDate] = useState(new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }))
-  const [members, setMembers] = useState<MemberWithId[]>([])
-  const [todayScores, setTodayScores] = useState<Record<string, string>>({})
-  const [loadingScores, setLoadingScores] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState('')
   const [requests, setRequests] = useState<PromotionRequest[]>([])
   const [guildRequests, setGuildRequests] = useState<GuildRequest[]>([])
   const [nickRequests, setNickRequests] = useState<NickRequest[]>([])
@@ -657,6 +657,13 @@ export default function AdminPage() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showReorderModal, setShowReorderModal] = useState(false)
   const [showBannerModal, setShowBannerModal] = useState(false)
+
+  // 주차별 합산 입력
+  const [weekDate, setWeekDate] = useState(getThisMonday())
+  const [weekScores, setWeekScores] = useState<Record<string, string>>({})
+  const [weekSaving, setWeekSaving] = useState(false)
+  const [weekSaved, setWeekSaved] = useState(false)
+  const [weekError, setWeekError] = useState('')
 
   useEffect(() => {
     const match = document.cookie.split(';').find(c => c.trim().startsWith('admin_role='))
@@ -670,11 +677,15 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/edit-member')
+    fetch('/api/weekly-totals')
       .then(r => r.json())
-      .then((data: MemberWithId[]) => { setMembers(data); setLoadingScores(false) })
-      .catch(() => setLoadingScores(false))
-  }, [])
+      .then((rows: { 길드: string; 주_시작일: string; 점수: number }[]) => {
+        const init: Record<string, string> = {}
+        rows.filter(r => r.주_시작일 === weekDate).forEach(r => { init[r.길드] = String(r.점수) })
+        setWeekScores(init)
+      })
+      .catch(() => {})
+  }, [weekDate])
 
   const handleAction = async (req: PromotionRequest, action: 'approve' | 'reject') => {
     setActionLoading(req.id)
@@ -709,30 +720,25 @@ export default function AdminPage() {
     setActionLoading(null)
   }
 
-  const handleSave = async () => {
-    const records = members
-      .filter(m => todayScores[m.닉네임] && todayScores[m.닉네임] !== '')
-      .map(m => ({ nickname: m.닉네임, score: Number(todayScores[m.닉네임]) }))
-    if (!records.length) return
-    setSaving(true)
-    setError('')
+  const handleWeekSave = async () => {
+    const entries = GUILDS
+      .filter(g => weekScores[g.key] && weekScores[g.key] !== '')
+      .map(g => ({ 길드: g.key, 주_시작일: weekDate, 점수: Number(weekScores[g.key]) }))
+    if (!entries.length) return
+    setWeekSaving(true)
+    setWeekError('')
     try {
-      const res = await fetch('/api/record', {
+      const res = await fetch('/api/weekly-totals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ records, date }),
+        body: JSON.stringify(entries),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || '오류')
-      setSaved(true)
-      setMembers(prev => prev.map(m =>
-        todayScores[m.닉네임] ? { ...m, 용협: Number(todayScores[m.닉네임]) } : m
-      ))
-      setTodayScores({})
+      if (!res.ok) throw new Error('저장 실패')
+      setWeekSaved(true)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '오류 발생')
+      setWeekError(e instanceof Error ? e.message : '오류 발생')
     } finally {
-      setSaving(false)
+      setWeekSaving(false)
     }
   }
 
@@ -857,90 +863,52 @@ export default function AdminPage() {
 
         <div className="mb-6" />
 
-        {/* 날짜 */}
-        <div className="mb-4 flex items-center gap-3">
-          <div>
-            <label className="text-xs text-slate-400 block mb-1">기록 날짜</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => { setDate(e.target.value); setSaved(false) }}
-              className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
-            />
+        {/* 주차별 용협 합산 입력 */}
+        <div className="bg-slate-800 rounded-xl p-4">
+          <h2 className="text-sm font-bold text-slate-300 mb-4">📊 주차별 용협 합산 입력</h2>
+
+          <div className="mb-4 flex items-center gap-3">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">주 시작일 (월요일)</label>
+              <input
+                type="date"
+                value={weekDate}
+                onChange={e => { setWeekDate(e.target.value); setWeekSaved(false) }}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
+              />
+            </div>
+            {weekSaved && <span className="text-green-400 text-sm mt-4">✅ 저장 완료!</span>}
           </div>
-          {saved && (
-            <span className="text-green-400 text-sm mt-4">✅ 저장 완료!</span>
+
+          {weekError && (
+            <div className="bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-red-300 text-sm mb-4">
+              {weekError}
+            </div>
           )}
-        </div>
 
-        {/* 에러 */}
-        {error && (
-          <div className="bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-red-300 text-sm mb-4">
-            {error}
+          <div className="space-y-3 mb-4">
+            {GUILDS.map(g => (
+              <div key={g.key} className="flex items-center gap-3">
+                <span className={`text-sm font-bold w-16 shrink-0 ${g.accentStrong}`}>{g.emoji} {g.key}</span>
+                <input
+                  type="number"
+                  value={weekScores[g.key] ?? ''}
+                  onChange={e => { setWeekSaved(false); setWeekScores(prev => ({ ...prev, [g.key]: e.target.value })) }}
+                  placeholder="합산 점수"
+                  className="flex-1 bg-slate-700 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-1 focus:ring-purple-500 tabular-nums placeholder-slate-600"
+                />
+              </div>
+            ))}
           </div>
-        )}
 
-        {/* 점수 입력 — 길드별 */}
-        {loadingScores ? (
-          <div className="text-slate-500 text-sm text-center py-8">불러오는 중...</div>
-        ) : (
-          <>
-            {GUILDS.map(g => {
-              const guildMembers = members.filter(m => m.길드 === g.key)
-              return (
-                <div key={g.key} className="mb-6 bg-slate-800 rounded-xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-300">
-                      {g.emoji} {g.key}
-                    </span>
-                    <span className="text-xs text-slate-500">({guildMembers.length}명)</span>
-                  </div>
-                  <div className="divide-y divide-slate-700/50">
-                    <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-slate-500">
-                      <span className="flex-1">닉네임</span>
-                      <span className="w-24 text-right">기존점수</span>
-                      <span className="w-28 text-right">오늘점수</span>
-                    </div>
-                    {guildMembers.map(m => (
-                      <div key={m.id} className="flex items-center gap-2 px-4 py-2">
-                        <span className="flex-1 text-sm text-white">
-                          {m.역할 === '길드마스터' ? '👑 ' : m.역할 === '부길드마스터' ? '⚜️ ' : ''}{m.닉네임}
-                        </span>
-                        <span className="w-24 text-right text-sm text-slate-400 tabular-nums">
-                          {m.용협 != null ? m.용협.toLocaleString() : '—'}
-                        </span>
-                        <input
-                          type="number"
-                          value={todayScores[m.닉네임] ?? ''}
-                          onChange={e => {
-                            setSaved(false)
-                            setTodayScores(prev => ({ ...prev, [m.닉네임]: e.target.value }))
-                          }}
-                          placeholder="0"
-                          className="w-28 bg-slate-700 rounded px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-purple-500 tabular-nums placeholder-slate-600"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* 저장 버튼 */}
-            {(() => {
-              const cnt = members.filter(m => todayScores[m.닉네임] && todayScores[m.닉네임] !== '').length
-              return (
-                <button
-                  onClick={handleSave}
-                  disabled={saving || cnt === 0}
-                  className="w-full rounded-xl py-3 font-medium transition text-sm bg-green-700 hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {saving ? '저장 중...' : `💾 DB 저장 (${cnt}명)`}
-                </button>
-              )
-            })()}
-          </>
-        )}
+          <button
+            onClick={handleWeekSave}
+            disabled={weekSaving || GUILDS.every(g => !weekScores[g.key])}
+            className="w-full rounded-xl py-3 font-medium transition text-sm bg-green-700 hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {weekSaving ? '저장 중...' : '💾 저장'}
+          </button>
+        </div>
       </div>
     </div>
   )

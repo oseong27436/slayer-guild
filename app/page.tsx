@@ -16,9 +16,10 @@ interface Member {
   용협체크일: string | null
 }
 
-interface HistoryEntry {
-  닉네임: string
-  weeks: { date: string; score: number | null; guild: string | null }[]
+interface WeeklyTotal {
+  길드: string
+  주_시작일: string
+  점수: number
 }
 
 interface PromotionHistoryEntry {
@@ -478,7 +479,7 @@ const FALLBACK_IMAGES: HeroImage[] = [
 
 export default function Home() {
   const [members, setMembers] = useState<Member[]>([])
-  const [history, setHistory] = useState<HistoryEntry[]>([])
+  const [weeklyTotals, setWeeklyTotals] = useState<WeeklyTotal[]>([])
   const [promotionHistory, setPromotionHistory] = useState<PromotionHistoryEntry[]>([])
   const [tab, setTab] = useState<'전체' | '히스토리' | '성장곡선'>('전체')
   const [sort, setSort] = useState<'기본' | '승급↓'>('기본')
@@ -525,11 +526,11 @@ export default function Home() {
     const timeout = setTimeout(() => controller.abort(), 10000)
     Promise.all([
       fetch('/api/members', { signal: controller.signal }).then(r => r.json()),
-      fetch('/api/history', { signal: controller.signal }).then(r => r.json()),
+      fetch('/api/weekly-totals', { signal: controller.signal }).then(r => r.json()),
       fetch('/api/promotion-history', { signal: controller.signal }).then(r => r.json()),
     ]).then(([m, h, ph]) => {
       setMembers(Array.isArray(m) ? m : [])
-      setHistory(Array.isArray(h) ? h : [])
+      setWeeklyTotals(Array.isArray(h) ? h : [])
       setPromotionHistory(Array.isArray(ph) ? ph : [])
       setLoading(false)
     }).catch(() => {
@@ -579,37 +580,8 @@ export default function Home() {
   const SEASON_4_START = '2026-06-01'
   const SEASON_4_END   = '2026-08-24'
 
-  // 길드별 일자별 합산 (기록 당시 길드 기준)
-  const guildDailyMap: Record<GuildKey, Record<string, number>> = Object.fromEntries(
-    GUILDS.map(g => [g.key, {} as Record<string, number>])
-  ) as Record<GuildKey, Record<string, number>>
-  history.forEach(entry => {
-    entry.weeks.forEach(w => {
-      if (w.score === null) return
-      const guild = w.guild
-      if (!guild || !GUILDS.some(g => g.key === guild)) return
-      const map = guildDailyMap[guild as GuildKey]
-      map[w.date] = (map[w.date] ?? 0) + w.score!
-    })
-  })
-
   const seasonStart = seasonTab === 's3' ? SEASON_3_START : SEASON_4_START
   const seasonEnd   = seasonTab === 's3' ? SEASON_3_END   : SEASON_4_END
-
-  // 시즌 기간 내 실제 기록이 있는 날짜 전체
-  const allDates = Array.from(new Set(GUILDS.flatMap(g => Object.keys(guildDailyMap[g.key]))))
-    .filter(d => d >= seasonStart && d <= seasonEnd)
-    .sort()
-
-  // 일별 누적 스냅샷 (기록이 없는 날은 직전 기록값을 유지) - 주차별 마지막 값 계산용
-  const lastValue = Object.fromEntries(GUILDS.map(g => [g.key, 0])) as Record<GuildKey, number>
-  const dailySnapshots = allDates.map(d => {
-    GUILDS.forEach(g => {
-      const v = guildDailyMap[g.key][d]
-      if (v !== undefined) lastValue[g.key] = v
-    })
-    return { date: d, ...lastValue }
-  })
 
   // 시즌 주차 목록 (현재 주까지만)
   const todayDate = new Date()
@@ -626,20 +598,16 @@ export default function Home() {
     cursor.setDate(cursor.getDate() + 7)
   }
 
-  // 주차별 마지막 기록값 (X축: N주차)
-  const weeklyTotals = seasonMondays
+  const chartData = seasonMondays
     .map((mon, i) => {
-      const endOfWeek = new Date(mon)
-      endOfWeek.setDate(endOfWeek.getDate() + 6)
-      const endStr = endOfWeek.toISOString().slice(0, 10)
-      const upTo = dailySnapshots.filter(d => d.date <= endStr)
-      const snapshot = upTo[upTo.length - 1]
-      if (!snapshot) return null
-      return { ...snapshot, week: i + 1 }
+      const row: Record<string, unknown> = { date: `${i + 1}주차` }
+      GUILDS.forEach(g => {
+        const found = weeklyTotals.find(w => w.길드 === g.key && w.주_시작일 === mon)
+        row[g.key] = found?.점수 ?? 0
+      })
+      return row as { date: string } & Record<GuildKey, number>
     })
-    .filter((d): d is { date: string; week: number } & Record<GuildKey, number> => d !== null)
-
-  const chartData = weeklyTotals.map(({ week, date, ...values }) => ({ date: `${week}주차`, ...values }))
+    .filter(row => GUILDS.some(g => row[g.key] > 0))
 
   const guildsWithData = GUILDS.filter(g => chartData.some(d => d[g.key] > 0)).map(g => g.key)
   const effectiveGuilds = selectedGuilds ?? guildsWithData
@@ -776,9 +744,9 @@ export default function Home() {
                       ))}
                     </LineChart>
                   </ResponsiveContainer>
-                  {weeklyTotals.length >= 1 && (() => {
-                    const last = weeklyTotals[weeklyTotals.length - 1]
-                    const prev = weeklyTotals.length > 1 ? weeklyTotals[weeklyTotals.length - 2] : null
+                  {chartData.length >= 1 && (() => {
+                    const last = chartData[chartData.length - 1]
+                    const prev = chartData.length > 1 ? chartData[chartData.length - 2] : null
                     return (
                       <div className={`grid ${GRID_COLS[effectiveGuilds.length]} gap-3 mt-4`}>
                         {GUILDS.filter(g => effectiveGuilds.includes(g.key)).map(g => {
