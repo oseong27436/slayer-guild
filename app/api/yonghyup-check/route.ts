@@ -39,7 +39,7 @@ export async function PATCH(req: Request) {
       const incomplete = guildMembers.filter(m => m.용협체크일 !== today)
       const cnt = incomplete.length
       const base = `${g.emoji} ${g.key} : ${cnt}명`
-      if (cnt >= 5) {
+      if (cnt > 0 && cnt < 5) {
         const names = incomplete.map(m => m.닉네임).join(', ')
         return `${base}\n  └ ${names}`
       }
