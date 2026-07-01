@@ -743,7 +743,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-6">
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 overflow-x-hidden">
       <div className="max-w-xl mx-auto">
         <h1 className="text-2xl font-bold mb-4">
           {role === 'manager' ? '⚔️ 길드 관리자 툴' : '⚔️ 길드 마스터 툴'}
@@ -895,7 +895,7 @@ export default function AdminPage() {
                   value={weekScores[g.key] ?? ''}
                   onChange={e => { setWeekSaved(false); setWeekScores(prev => ({ ...prev, [g.key]: e.target.value })) }}
                   placeholder="합산 점수"
-                  className="flex-1 bg-slate-700 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-1 focus:ring-purple-500 tabular-nums placeholder-slate-600"
+                  className="flex-1 min-w-0 bg-slate-700 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-1 focus:ring-purple-500 tabular-nums placeholder-slate-600"
                 />
               </div>
             ))}
